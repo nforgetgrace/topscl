@@ -1,0 +1,19 @@
+{
+  "device": "emulator-5582",
+  "android": "16",
+  "suite": "filtered",
+  "passed": true,
+  "apk_sha256": "1d1cc1f3ebd9d5efc70f253b45e6765aa74707f136df52acd50086fb48674263",
+  "tests": [
+    {
+      "test": "very long web respects time budget and resumes on next tap",
+      "result": "PASS",
+      "seconds": 20.62,
+      "measurements": {
+        "start_scroll_y": 85287,
+        "stopped_scroll_y": 79295,
+        "configured_seconds": 4
+      }
+    }
+  ]
+}

@@ -130,10 +130,10 @@ public final class TopTapService extends AccessibilityService implements SharedP
             return;
         }
         if (trigger != null && overlayWindowId != activeWindowId) removeOverlay();
+        boolean visible = Build.VERSION.SDK_INT < 30 || windows.getCurrentWindowMetrics().getWindowInsets().isVisible(android.view.WindowInsets.Type.statusBars());
         if (trigger != null) {
             // Overlay root insets omit the bar even when it is visible. Display window metrics
             // reflect the foreground app's actual fullscreen state.
-            boolean visible = Build.VERSION.SDK_INT < 30 || windows.getCurrentWindowMetrics().getWindowInsets().isVisible(android.view.WindowInsets.Type.statusBars());
             WindowManager.LayoutParams params = (WindowManager.LayoutParams)trigger.getLayoutParams();
             int flags = visible ? params.flags & ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE : params.flags | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
             if (params.flags != flags) { params.flags = flags; windows.updateViewLayout(trigger, params); }
@@ -153,6 +153,7 @@ public final class TopTapService extends AccessibilityService implements SharedP
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.LEFT; params.x = 0; params.y = 0;
+        if (!visible) params.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
         params.setTitle("TopTap trigger");
         if (Build.VERSION.SDK_INT >= 28) params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         TriggerView candidate = new TriggerView(this, metrics.widthPixels);
@@ -165,7 +166,7 @@ public final class TopTapService extends AccessibilityService implements SharedP
             }
             return insets;
         });
-        try { windows.addView(candidate, params); trigger = candidate; overlayWindowId = activeWindowId; ServiceStatus.overlayVisible = true; ServiceStatus.overlayError = false; }
+        try { windows.addView(candidate, params); trigger = candidate; overlayWindowId = activeWindowId; ServiceStatus.overlayVisible = visible; ServiceStatus.overlayError = false; }
         catch (WindowManager.BadTokenException | IllegalStateException | SecurityException e) {
             ServiceStatus.overlayVisible = false;
             ServiceStatus.overlayError = true;

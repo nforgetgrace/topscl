@@ -29,6 +29,7 @@ parser.add_argument("--serial", required=True)
 parser.add_argument("--adb", default=os.environ.get("ADB", "adb"))
 parser.add_argument("--quick", action="store_true")
 parser.add_argument("--only", action="append", help="Run only cases containing this text (repeatable)")
+parser.add_argument("--apk", type=Path, default=ROOT/"app/build/outputs/apk/debug/app-debug.apk", help="Product APK to verify, including a historical regression baseline")
 args = parser.parse_args()
 if not args.serial.startswith("emulator-"):
     parser.error("Only a disposable Android emulator is accepted, never a personal device.")
@@ -104,6 +105,27 @@ def status_bar_height():
     assert match,"Could not read the actual system status-bar height"
     return int(match.group(1))
 
+def render_stats():
+    durations=[];missed=0;deadlines=0
+    output=shell("dumpsys","gfxinfo",FIXTURE,"framestats")
+    for block in output.split("---PROFILEDATA---")[1::2]:
+        lines=[line.strip().rstrip(',').split(',') for line in block.splitlines() if ',' in line]
+        if not lines or 'IntendedVsync' not in lines[0]:continue
+        for values in lines[1:]:
+            try:
+                frame=dict(zip(lines[0],map(int,values)))
+                if frame.get('Flags',1)!=0:continue
+                start,end=frame['IntendedVsync'],frame['FrameCompleted']
+                if not (0<start<end<2**63-1):continue
+                durations.append((end-start)/1e6)
+                deadline=frame.get('FrameDeadline',0)
+                if deadline>start:deadlines+=1;missed+=end>deadline
+            except (ValueError,KeyError):continue
+    durations.sort()
+    if not durations:return dict(render_retained_frames=0)
+    return dict(render_retained_frames=len(durations),render_p95_ms=round(durations[min(len(durations)-1,int(len(durations)*.95))],2),
+                render_max_ms=round(durations[-1],2),render_missed_deadlines=missed,render_deadlines=deadlines)
+
 def screenshot(name):
     output = ROOT / "docs" / "screenshots" / (args.serial + "-" + name + ".png")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -175,12 +197,62 @@ def reaches_top(mode):
 try:
     assert shell("getprop", "ro.kernel.qemu") == "1", "Not an emulator"
     shell("input","keyevent","224");shell("wm","dismiss-keyguard");shell("logcat","-c")
-    adb("install", "-r", str(ROOT/"app/build/outputs/apk/debug/app-debug.apk"))
+    adb("install", "-r", "-d", str(args.apk))
     adb("install", "-r", str(ROOT/"fixture/build/outputs/apk/debug/fixture-debug.apk"))
     setup()
     for mode in ("direct", "granular", "list", "grid", "web"):
         case("cross-app "+mode+" returns to actual top", lambda m=mode: reaches_top(m))
     if not args.quick:
+        def audit_top(mode):
+            setup(fast_scroll=True,timeout=20 if mode=="audit_deep" else 12)
+            launch(mode,10000 if mode=="audit_deep" else 240)
+            wait_for(overlay_present)
+            before=pref("position")
+            if mode=="audit_zero_y":
+                assert pref("event_y")==0 and pref("event_index")>0,"Contradictory zero-y event was not seeded"
+            if mode=="audit_zero_index":
+                assert pref("event_y")>0 and pref("event_index")==0,"Contradictory zero-index event was not seeded"
+            if mode=="audit_stale":
+                assert pref("event_index")==0,"Stale top event was not seeded"
+            shell("dumpsys","gfxinfo",FIXTURE,"reset")
+            started_ms=int(float(shell("cat","/proc/uptime").split()[0])*1000)
+            tap()
+            wait_for(lambda:pref("position")==0 and pref("offset_px")==0,timeout=22 if mode=="audit_deep" else 14,
+                     message=lambda:f"{mode} actual top from {before}; last={pref('position')}, offset={pref('offset_px')}")
+            time.sleep(.8)
+            assert pref("position")==0 and pref("offset_px")==0,"Top was transient or first row remains clipped"
+            if mode=="audit_partial":assert pref("partial_used"),"Partial native action not exercised"
+            if mode=="audit_panes":assert pref("other_position")==before,"The larger neighboring list moved"
+            if mode=="audit_replace":assert pref("replaced"),"The viewport was not rebuilt during the gesture run"
+            trace=json.loads(shell("run-as",FIXTURE,"cat","files/motion.json"))
+            movement=[(t,y) for t,y in trace["motion"] if t>=started_ms]
+            assert len(movement)>=5 and movement[-1][1]==0,"No recorded animated arrival at top"
+            first_zero=next(i for i,(_,y) in enumerate(movement) if y==0)
+            forward=movement[:first_zero+1]
+            assert all(b[1]<=a[1] for a,b in zip(forward,forward[1:])),"Movement reversed before top"
+            max_gap=max(b[0]-a[0] for a,b in zip(forward,forward[1:]))
+            # Rebuilding/destroying the target inherently ends its native animation;
+            # measure bounded reconnection separately from a continuous viewport.
+            gap_limit=600 if mode=="audit_replace" else 150 if mode=="audit_partial" else 100
+            assert max_gap<=gap_limit,f"Visible pause in recorded movement: {max_gap}ms (limit {gap_limit}ms)"
+            assert not any(t>forward[-1][0] and action==0 for t,action in trace['touch']),"An extra pull was sent after reaching top"
+            measurements.update(start_position=before,settled_position=pref("position"),offset_px=pref("offset_px"),
+                                animation_ms=forward[-1][0]-forward[0][0],max_position_sample_gap_ms=max_gap,
+                                injected_swipes=pref("touch_count") or 0)
+            measurements.update(render_stats())
+            (ROOT/"docs"/("motion-"+args.serial+"-"+mode+".json")).write_text(json.dumps(trace)+"\n")
+        for mode in ("audit_zero_y","audit_zero_index","audit_silent","audit_partial","audit_deep","audit_stale","audit_panes","audit_replace"):
+            case("audit "+mode+" returns to unclipped actual top",lambda m=mode:audit_top(m))
+        def audit_no_progress():
+            setup(factory_defaults=True);launch("audit_noop",240);wait_for(overlay_present);tap();time.sleep(3)
+            count=pref("touch_count") or 0
+            assert 1<=count<=3 and pref("position")==240,"No-progress run did not stop within three gestures"
+            time.sleep(1);assert pref("touch_count")==count,"No-progress run kept injecting touches"
+        case("audit a viewport accepting no movement stops without repeated pulls",audit_no_progress)
+        def audit_silent_top():
+            setup(factory_defaults=True);launch("audit_silent",0);wait_for(overlay_present);tap();time.sleep(1)
+            assert pref("position")==0 and not pref("touch_count"),"A silent viewport already at top received a pull"
+        case("audit a silent viewport already at top receives no gesture",audit_silent_top)
         def horizontal():
             launch("horizontal"); before=pref("position");tap();time.sleep(1);assert pref("position")==before
         case("horizontal-only carousel unchanged", horizontal)
@@ -194,9 +266,19 @@ try:
             setup(gesture_fallback=True);launch("gesture",3);wait_for(overlay_present);tap();wait_for(lambda:pref("position")==0,message="opt-in swipe returned to top")
         case("opt-in gesture fallback scrolls identified viewport",fallback_enabled)
         def bounded_web():
-            setup(timeout=4);launch("web",200);wait_for(overlay_present);before=pref("position");tap();time.sleep(5)
-            stopped=pref("position");assert 0<stopped<before;time.sleep(.8);assert pref("position")==stopped
+            setup(timeout=4);launch("web",200);wait_for(overlay_present)
+            # Faster native handoffs can finish the old ~16,000px seed before 4s.
+            # Seed a genuinely long remaining distance using only real touch input.
+            for _ in range(30):
+                if (pref("position") or 0)>=50_000:break
+                shell("input","swipe",540,1900,540,700,160);time.sleep(.1)
+            time.sleep(.8);before=pref("position")
+            assert before>=50_000,f"Budget fixture was too short: {before}px"
+            tap();time.sleep(5)
+            stopped=pref("position");assert 0<stopped<before,f"Budget did not stop between start {before} and top: {stopped}"
+            time.sleep(.8);assert pref("position")==stopped
             tap();time.sleep(.8);assert pref("position")<stopped;tap();time.sleep(.8)
+            measurements.update(start_scroll_y=before,stopped_scroll_y=stopped,configured_seconds=4)
         case("very long web respects time budget and resumes on next tap",bounded_web)
         def paused():
             setup(enabled=False);launch();wait_for(lambda:not overlay_present());before=pref("position");tap();time.sleep(.7);assert pref("position")==before
@@ -242,6 +324,7 @@ try:
             artifact=mode+("-deep" if offset is not None else "")
             setup(fast_scroll=True);launch(mode,initial);wait_for(overlay_present)
             old_touches=pref("touch_count") or 0
+            shell("dumpsys","gfxinfo",FIXTURE,"reset")
             started_ms=int(float(shell("cat","/proc/uptime").split()[0])*1000)
             started=time.monotonic();tap();wait_for(lambda:pref("position")==0,timeout=12,message="smooth "+mode+" reached top")
             time.sleep(.7)
@@ -275,8 +358,10 @@ try:
             max_gap=max(b[0]-a[0] for a,b in zip(forward,forward[1:]))
             assert max_gap<=100,f"Visible pause in the measured animation: {max_gap}ms"
             injected=(pref("touch_count") or 0)-old_touches
+            if mode in ("list","grid"):assert injected==0,"A native first-row animation was interrupted by injected swipes"
             if injected:assert any(distance>200 for distance in glides),f"No sustained post-release glide: {glides}"
             measurements.update(motion_kind="animated",animation_ms=forward[-1][0]-forward[0][0],max_frame_gap_ms=max_gap,injected_swipes=injected,settled_position=pref("position"))
+            measurements.update(render_stats())
             screenshot("qa-smooth-"+artifact+"-top")
         for mode in ("list","grid","web","fling_list"):
             case("fast "+mode+" reaches actual top with measured motion",lambda m=mode:smooth_top(m))
@@ -470,7 +555,7 @@ try:
             assert pref("position")==120 and (pref("touch_count") or 0)==stock_touches,"Fullscreen touch handling differs from stock"
             launch("direct",350);wait_for(overlay_present);tap();wait_for(lambda:pref("position")==0,timeout=3)
         case("fullscreen content is not intercepted and the status bar recovers",immersive)
-        def chrome_article():
+        def chrome_article(nested=False):
             # The real Chrome app renders an offline article served only through this emulator's ADB tunnel.
             observed={}
             article="""<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -481,7 +566,17 @@ const motion=[];let timer,frame=false;
 function report(){fetch('/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({y:scrollY,motion})});}
 addEventListener('scroll',()=>{if(!frame){frame=true;requestAnimationFrame(()=>{motion.push([performance.now(),scrollY]);frame=false;});}clearTimeout(timer);timer=setTimeout(report,150);});
 setTimeout(()=>{scrollTo(0,18000);setTimeout(report,400);},300);
-</script>""".encode()
+</script>"""
+            if nested:
+                article=article.replace("<h1>TOP_REACHED</h1><main></main>","<header>Fixed outer page</header><main><h1>TOP_REACHED</h1><div></div></main>")
+                article=article.replace("document.querySelector('main').innerHTML", "document.querySelector('main div').innerHTML")
+                article=article.replace("const motion=[]", "const panel=document.querySelector('main');const motion=[]")
+                article=article.replace("y:scrollY,motion", "y:panel.scrollTop,outer_y:scrollY,motion")
+                article=article.replace("addEventListener('scroll'", "panel.addEventListener('scroll'")
+                article=article.replace("performance.now(),scrollY", "performance.now(),panel.scrollTop")
+                article=article.replace("scrollTo(0,18000)", "panel.scrollTo(0,18000)")
+                article=article.replace("</style>","body{height:100dvh;margin:0;overflow:hidden}header{height:72px}main{height:calc(100dvh - 72px);overflow-y:auto;padding:0 20px;box-sizing:border-box}</style>")
+            article=article.encode()
             class Handler(http.server.BaseHTTPRequestHandler):
                 def log_message(self,*args):pass
                 def do_GET(self):
@@ -505,15 +600,17 @@ setTimeout(()=>{scrollTo(0,18000);setTimeout(report,400);},300);
                 motion=observed['motion'][first:]
                 assert motion and motion[-1][1]==0,"Chrome did not reach the actual document top"
                 assert all(b[1]<=a[1] for a,b in zip(motion,motion[1:])),"Chrome changed scroll direction"
-                assert elapsed<2,"Chrome did not use a fast document-start action"
+                if not nested:assert elapsed<2,"Chrome did not use a fast document-start action"
+                if nested:assert observed['outer_y']==0,"The outer document moved instead of the nested viewport"
                 report=dict(seconds_to_top=round(elapsed,3),motion_kind="animated" if len(motion)>5 else "instant_native",frames=len(motion),max_frame_gap_ms=round(max((b[0]-a[0] for a,b in zip(motion,motion[1:])),default=0),2),final_scroll_y=observed['y'])
                 measurements.update(report)
                 version=shell("getprop","ro.build.version.sdk")
-                (ROOT/"docs"/("chrome-motion-api"+version+".json")).write_text(json.dumps(dict(report=report,motion=motion))+"\n")
-                screenshot("qa-real-chrome-top")
+                (ROOT/"docs"/("chrome-motion-api"+version+("-nested" if nested else "")+".json")).write_text(json.dumps(dict(report=report,motion=motion))+"\n")
+                screenshot("qa-real-chrome"+("-nested" if nested else "")+"-top")
             finally:
                 adb("reverse","--remove",f"tcp:{port}",check=False);server.shutdown();server.server_close();thread.join(timeout=2)
         case("real Chrome local article reaches document top within two seconds",chrome_article)
+        case("audit real Chrome CSS overflow panel reaches its actual top",lambda:chrome_article(nested=True))
     complete = True
 finally:
     shell("input","keyevent","224",check=False);shell("wm","dismiss-keyguard",check=False)
@@ -521,7 +618,7 @@ finally:
     shell("settings","put","secure","accessibility_enabled",original_enabled if original_enabled!="null" else "0",check=False)
     version=shell("getprop","ro.build.version.sdk")
     report = dict(device=args.serial, android=shell("getprop","ro.build.version.release"), suite="filtered" if args.only else "quick" if args.quick else "full", passed=complete,
-                  apk_sha256=hashlib.sha256((ROOT/"app/build/outputs/apk/debug/app-debug.apk").read_bytes()).hexdigest(), tests=results)
+                  apk_sha256=hashlib.sha256(args.apk.read_bytes()).hexdigest(), tests=results)
     filename="e2e-results-api"+version+("-filtered" if args.only else "")+".json"
     (ROOT/"docs"/filename).write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n")
 print(f"PASS: {len(results)} emulator end-to-end cases",flush=True)

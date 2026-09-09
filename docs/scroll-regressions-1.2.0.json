@@ -1,0 +1,55 @@
+{
+  "apk_sha256": "42558b6a3cf21cfd0ed8cea72a287579d219cf7ab4b563dbb29157b30084fa8a",
+  "device": "emulator-5582",
+  "android": "16",
+  "purpose": "Historical baseline: seven expected failures and one compatibility control. Final product results are separate.",
+  "tests": [
+    {
+      "test": "audit audit_zero_y returns to unclipped actual top",
+      "result": "FAIL",
+      "error": "Timed out: audit_zero_y actual top from 240; last=240, offset=0"
+    },
+    {
+      "test": "audit audit_zero_index returns to unclipped actual top",
+      "result": "FAIL",
+      "error": "Timed out: audit_zero_index actual top from 240; last=131, offset=3"
+    },
+    {
+      "test": "audit audit_silent returns to unclipped actual top",
+      "result": "FAIL",
+      "error": "Timed out: audit_silent actual top from 240; last=131, offset=3"
+    },
+    {
+      "test": "audit audit_partial returns to unclipped actual top",
+      "result": "FAIL",
+      "error": "Timed out: audit_partial actual top from 240; last=120, offset=0"
+    },
+    {
+      "test": "audit audit_deep returns to unclipped actual top",
+      "result": "FAIL",
+      "error": "Timed out: audit_deep actual top from 10000; last=3235, offset=-120"
+    },
+    {
+      "test": "audit audit_stale returns to unclipped actual top",
+      "result": "FAIL",
+      "error": "Timed out: audit_stale actual top from 240; last=240, offset=0"
+    },
+    {
+      "test": "audit audit_panes returns to unclipped actual top",
+      "result": "FAIL",
+      "error": "Timed out: audit_panes actual top from 240; last=240, offset=0"
+    },
+    {
+      "test": "audit real Chrome CSS overflow panel reaches its actual top",
+      "result": "PASS",
+      "seconds": 5.49,
+      "measurements": {
+        "seconds_to_top": 0.315,
+        "motion_kind": "instant_native",
+        "frames": 1,
+        "max_frame_gap_ms": 0,
+        "final_scroll_y": 0
+      }
+    }
+  ]
+}

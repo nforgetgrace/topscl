@@ -3,97 +3,251 @@
   "android": "16",
   "suite": "full",
   "passed": true,
-  "apk_sha256": "42558b6a3cf21cfd0ed8cea72a287579d219cf7ab4b563dbb29157b30084fa8a",
+  "apk_sha256": "1d1cc1f3ebd9d5efc70f253b45e6765aa74707f136df52acd50086fb48674263",
   "tests": [
     {
       "test": "cross-app direct returns to actual top",
       "result": "PASS",
-      "seconds": 2.06
+      "seconds": 2.13
     },
     {
       "test": "cross-app granular returns to actual top",
       "result": "PASS",
-      "seconds": 2.09
+      "seconds": 2.08
     },
     {
       "test": "cross-app list returns to actual top",
       "result": "PASS",
-      "seconds": 4.06
+      "seconds": 3.98
     },
     {
       "test": "cross-app grid returns to actual top",
       "result": "PASS",
-      "seconds": 2.62
+      "seconds": 2.6
     },
     {
       "test": "cross-app web returns to actual top",
       "result": "PASS",
-      "seconds": 6.39
+      "seconds": 6.31
+    },
+    {
+      "test": "audit audit_zero_y returns to unclipped actual top",
+      "result": "PASS",
+      "seconds": 4.72,
+      "measurements": {
+        "start_position": 240,
+        "settled_position": 0,
+        "offset_px": 0,
+        "animation_ms": 1383,
+        "max_position_sample_gap_ms": 19,
+        "injected_swipes": 3,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.14,
+        "render_max_ms": 17.46,
+        "render_missed_deadlines": 1,
+        "render_deadlines": 120
+      }
+    },
+    {
+      "test": "audit audit_zero_index returns to unclipped actual top",
+      "result": "PASS",
+      "seconds": 4.69,
+      "measurements": {
+        "start_position": 240,
+        "settled_position": 0,
+        "offset_px": 0,
+        "animation_ms": 1383,
+        "max_position_sample_gap_ms": 33,
+        "injected_swipes": 3,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.66,
+        "render_max_ms": 33.74,
+        "render_missed_deadlines": 2,
+        "render_deadlines": 120
+      }
+    },
+    {
+      "test": "audit audit_silent returns to unclipped actual top",
+      "result": "PASS",
+      "seconds": 4.69,
+      "measurements": {
+        "start_position": 240,
+        "settled_position": 0,
+        "offset_px": 0,
+        "animation_ms": 1385,
+        "max_position_sample_gap_ms": 18,
+        "injected_swipes": 3,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.28,
+        "render_max_ms": 18.06,
+        "render_missed_deadlines": 1,
+        "render_deadlines": 120
+      }
+    },
+    {
+      "test": "audit audit_partial returns to unclipped actual top",
+      "result": "PASS",
+      "seconds": 4.16,
+      "measurements": {
+        "start_position": 240,
+        "settled_position": 0,
+        "offset_px": 0,
+        "animation_ms": 966,
+        "max_position_sample_gap_ms": 100,
+        "injected_swipes": 2,
+        "render_retained_frames": 94,
+        "render_p95_ms": 18.39,
+        "render_max_ms": 36.31,
+        "render_missed_deadlines": 6,
+        "render_deadlines": 94
+      }
+    },
+    {
+      "test": "audit audit_deep returns to unclipped actual top",
+      "result": "PASS",
+      "seconds": 20.35,
+      "measurements": {
+        "start_position": 10000,
+        "settled_position": 0,
+        "offset_px": 0,
+        "animation_ms": 17120,
+        "max_position_sample_gap_ms": 26,
+        "injected_swipes": 33,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.09,
+        "render_max_ms": 17.37,
+        "render_missed_deadlines": 1,
+        "render_deadlines": 120
+      }
+    },
+    {
+      "test": "audit audit_stale returns to unclipped actual top",
+      "result": "PASS",
+      "seconds": 5.96,
+      "measurements": {
+        "start_position": 240,
+        "settled_position": 0,
+        "offset_px": 0,
+        "animation_ms": 1382,
+        "max_position_sample_gap_ms": 19,
+        "injected_swipes": 3,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.44,
+        "render_max_ms": 18.91,
+        "render_missed_deadlines": 1,
+        "render_deadlines": 120
+      }
+    },
+    {
+      "test": "audit audit_panes returns to unclipped actual top",
+      "result": "PASS",
+      "seconds": 7.84,
+      "measurements": {
+        "start_position": 240,
+        "settled_position": 0,
+        "offset_px": 0,
+        "animation_ms": 4000,
+        "max_position_sample_gap_ms": 18,
+        "injected_swipes": 0,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.15,
+        "render_max_ms": 17.6,
+        "render_missed_deadlines": 1,
+        "render_deadlines": 120
+      }
+    },
+    {
+      "test": "audit audit_replace returns to unclipped actual top",
+      "result": "PASS",
+      "seconds": 5.0,
+      "measurements": {
+        "start_position": 240,
+        "settled_position": 0,
+        "offset_px": 0,
+        "animation_ms": 1832,
+        "max_position_sample_gap_ms": 384,
+        "injected_swipes": 4,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.2,
+        "render_max_ms": 17.68,
+        "render_missed_deadlines": 2,
+        "render_deadlines": 120
+      }
+    },
+    {
+      "test": "audit a viewport accepting no movement stops without repeated pulls",
+      "result": "PASS",
+      "seconds": 6.02
+    },
+    {
+      "test": "audit a silent viewport already at top receives no gesture",
+      "result": "PASS",
+      "seconds": 2.96
     },
     {
       "test": "horizontal-only carousel unchanged",
       "result": "PASS",
-      "seconds": 2.19
+      "seconds": 2.18
     },
     {
       "test": "range control value is never adjusted",
       "result": "PASS",
-      "seconds": 2.2
+      "seconds": 2.18
     },
     {
       "test": "gesture fallback is disabled by default",
       "result": "PASS",
-      "seconds": 3.62
+      "seconds": 3.52
     },
     {
       "test": "opt-in gesture fallback scrolls identified viewport",
       "result": "PASS",
-      "seconds": 2.66
+      "seconds": 2.81
     },
     {
       "test": "very long web respects time budget and resumes on next tap",
       "result": "PASS",
-      "seconds": 14.23
+      "seconds": 14.17
     },
     {
       "test": "pause removes overlay and disables trigger",
       "result": "PASS",
-      "seconds": 2.7
+      "seconds": 2.69
     },
     {
       "test": "excluded app untouched",
       "result": "PASS",
-      "seconds": 2.69
+      "seconds": 2.68
     },
     {
       "test": "old two-tap and narrow-region settings migrate to one tap",
       "result": "PASS",
-      "seconds": 2.25
+      "seconds": 2.23
     },
     {
       "test": "trigger downward drag opens shade without scrolling",
       "result": "PASS",
-      "seconds": 3.53
+      "seconds": 3.54
     },
     {
       "test": "second activation cancels ongoing scroll",
       "result": "PASS",
-      "seconds": 7.83
+      "seconds": 7.74
     },
     {
       "test": "changed window does not inherit previous scroll",
       "result": "PASS",
-      "seconds": 8.25
+      "seconds": 8.19
     },
     {
       "test": "OS rebind after process death and scrolling recovered",
       "result": "PASS",
-      "seconds": 5.27
+      "seconds": 5.22
     },
     {
       "test": "screen off removes trigger; unlock restores it",
       "result": "PASS",
-      "seconds": 4.53
+      "seconds": 4.45
     },
     {
       "test": "permission revocation removes overlay",
@@ -103,31 +257,41 @@
     {
       "test": "fast list reaches actual top with measured motion",
       "result": "PASS",
-      "seconds": 5.6,
+      "seconds": 5.59,
       "measurements": {
         "motion_kind": "animated",
         "animation_ms": 2000,
-        "max_frame_gap_ms": 19,
+        "max_frame_gap_ms": 18,
         "injected_swipes": 0,
-        "settled_position": 0
+        "settled_position": 0,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.25,
+        "render_max_ms": 17.45,
+        "render_missed_deadlines": 1,
+        "render_deadlines": 120
       }
     },
     {
       "test": "fast grid reaches actual top with measured motion",
       "result": "PASS",
-      "seconds": 4.16,
+      "seconds": 4.21,
       "measurements": {
         "motion_kind": "animated",
-        "animation_ms": 666,
-        "max_frame_gap_ms": 19,
+        "animation_ms": 667,
+        "max_frame_gap_ms": 18,
         "injected_swipes": 0,
-        "settled_position": 0
+        "settled_position": 0,
+        "render_retained_frames": 59,
+        "render_p95_ms": 17.2,
+        "render_max_ms": 17.48,
+        "render_missed_deadlines": 2,
+        "render_deadlines": 59
       }
     },
     {
       "test": "fast web reaches actual top with measured motion",
       "result": "PASS",
-      "seconds": 5.93,
+      "seconds": 5.89,
       "measurements": {
         "motion_kind": "instant_native",
         "settled_position": 0,
@@ -137,46 +301,56 @@
     {
       "test": "fast fling_list reaches actual top with measured motion",
       "result": "PASS",
-      "seconds": 4.49,
+      "seconds": 4.48,
       "measurements": {
         "motion_kind": "animated",
-        "animation_ms": 866,
-        "max_frame_gap_ms": 19,
+        "animation_ms": 867,
+        "max_frame_gap_ms": 18,
         "injected_swipes": 2,
-        "settled_position": 0
+        "settled_position": 0,
+        "render_retained_frames": 93,
+        "render_p95_ms": 17.19,
+        "render_max_ms": 17.41,
+        "render_missed_deadlines": 2,
+        "render_deadlines": 93
       }
     },
     {
       "test": "deep gesture-only list reaches actual top with measured motion",
       "result": "PASS",
-      "seconds": 5.35,
+      "seconds": 5.34,
       "measurements": {
         "motion_kind": "animated",
-        "animation_ms": 1800,
+        "animation_ms": 1799,
         "max_frame_gap_ms": 19,
         "injected_swipes": 4,
-        "settled_position": 0
+        "settled_position": 0,
+        "render_retained_frames": 120,
+        "render_p95_ms": 17.09,
+        "render_max_ms": 20.36,
+        "render_missed_deadlines": 1,
+        "render_deadlines": 120
       }
     },
     {
       "test": "smooth list already at top receives no physical swipe",
       "result": "PASS",
-      "seconds": 2.78
+      "seconds": 2.76
     },
     {
       "test": "smooth web already at top receives no physical swipe",
       "result": "PASS",
-      "seconds": 3.09
+      "seconds": 3.15
     },
     {
       "test": "smooth cancel stops sending additional gestures",
       "result": "PASS",
-      "seconds": 4.74
+      "seconds": 4.73
     },
     {
       "test": "smooth immediate second tap does not restart a cancelled stroke",
       "result": "PASS",
-      "seconds": 4.55
+      "seconds": 4.51
     },
     {
       "test": "single stop tap works with a legacy two-tap preference",
@@ -191,22 +365,22 @@
     {
       "test": "closing TopTap in recent apps keeps background scrolling available",
       "result": "PASS",
-      "seconds": 6.38
+      "seconds": 6.27
     },
     {
       "test": "fast mode uses native end action for direct",
       "result": "PASS",
-      "seconds": 2.32,
+      "seconds": 2.3,
       "measurements": {
-        "seconds_to_top": 0.441
+        "seconds_to_top": 0.431
       }
     },
     {
       "test": "fast mode uses native end action for granular",
       "result": "PASS",
-      "seconds": 2.32,
+      "seconds": 2.3,
       "measurements": {
-        "seconds_to_top": 0.443
+        "seconds_to_top": 0.421
       }
     },
     {
@@ -214,18 +388,18 @@
       "result": "PASS",
       "seconds": 2.3,
       "measurements": {
-        "seconds_to_top": 0.437
+        "seconds_to_top": 0.432
       }
     },
     {
       "test": "page-only accessibility action is supported",
       "result": "PASS",
-      "seconds": 2.57
+      "seconds": 2.56
     },
     {
       "test": "one tap works at fifteen positions across the full status bar",
       "result": "PASS",
-      "seconds": 22.53,
+      "seconds": 22.27,
       "measurements": {
         "tap_locations": 15,
         "status_bar_height": 128
@@ -234,12 +408,12 @@
     {
       "test": "user-enabled session is foreground without notification permission",
       "result": "PASS",
-      "seconds": 1.94
+      "seconds": 1.95
     },
     {
       "test": "real recent-apps Clear all preserves scrolling for three cycles",
       "result": "PASS",
-      "seconds": 22.9,
+      "seconds": 22.68,
       "measurements": {
         "clear_all_cycles": 3
       }
@@ -247,7 +421,7 @@
     {
       "test": "status-bar pixels match stock both idle and scrolling",
       "result": "PASS",
-      "seconds": 22.7,
+      "seconds": 21.54,
       "measurements": {
         "status_bar_height": 128,
         "compared_rgba_bytes": 552960,
@@ -258,7 +432,7 @@
     {
       "test": "status-bar pixels preserve light_status appearance",
       "result": "PASS",
-      "seconds": 6.59,
+      "seconds": 6.62,
       "measurements": {
         "status_bar_height": 128,
         "compared_rgba_bytes": 552960,
@@ -269,7 +443,7 @@
     {
       "test": "status-bar pixels preserve dark_status appearance",
       "result": "PASS",
-      "seconds": 6.61,
+      "seconds": 6.54,
       "measurements": {
         "status_bar_height": 128,
         "compared_rgba_bytes": 552960,
@@ -280,12 +454,12 @@
     {
       "test": "default mode handles a vertical viewport with no upward actions",
       "result": "PASS",
-      "seconds": 2.7
+      "seconds": 2.57
     },
     {
       "test": "upgrade ignores the old disabled smooth-mode preference",
       "result": "PASS",
-      "seconds": 2.24
+      "seconds": 2.25
     },
     {
       "test": "saved enable flag cannot activate scrolling without local consent",
@@ -295,17 +469,17 @@
     {
       "test": "landscape keeps the entire status bar usable with one tap",
       "result": "PASS",
-      "seconds": 6.87
+      "seconds": 6.76
     },
     {
       "test": "quick settings pause stops the session and resume restores scrolling",
       "result": "PASS",
-      "seconds": 6.6
+      "seconds": 6.54
     },
     {
       "test": "explicit system Stop still stops the entire app",
       "result": "PASS",
-      "seconds": 4.06
+      "seconds": 3.99
     },
     {
       "test": "fullscreen content is not intercepted and the status bar recovers",
@@ -315,12 +489,24 @@
     {
       "test": "real Chrome local article reaches document top within two seconds",
       "result": "PASS",
-      "seconds": 5.67,
+      "seconds": 5.7,
       "measurements": {
-        "seconds_to_top": 0.318,
+        "seconds_to_top": 0.314,
         "motion_kind": "instant_native",
         "frames": 1,
         "max_frame_gap_ms": 0,
+        "final_scroll_y": 0
+      }
+    },
+    {
+      "test": "audit real Chrome CSS overflow panel reaches its actual top",
+      "result": "PASS",
+      "seconds": 6.93,
+      "measurements": {
+        "seconds_to_top": 1.834,
+        "motion_kind": "animated",
+        "frames": 88,
+        "max_frame_gap_ms": 32.7,
         "final_scroll_y": 0
       }
     }

@@ -4,15 +4,20 @@ package kr.toptap.android.core;
 public final class ScrollCoast {
     private long gestureEnd;
     private long lastMotion;
-    private long quietPeriod;
+    private boolean physical, observedMotion;
     public void begin(long now, boolean physicalGesture) {
         gestureEnd = now; lastMotion = now;
-        // Accessibility scroll events are batched at 50ms. Leave a small margin
-        // for a physical fling handoff; native end animations get a longer quiet window.
-        quietPeriod = physicalGesture ? 80 : 160;
+        physical = physicalGesture; observedMotion = false;
     }
-    public void motion(long now) { lastMotion = Math.max(lastMotion, now); }
+    public void motion(long now) {
+        if (now < gestureEnd) return; // A delayed event belongs to the preceding action.
+        lastMotion = Math.max(lastMotion, now); observedMotion = true;
+    }
     public long remaining(long now) {
-        return Math.max(0, Math.max(gestureEnd + 450, lastMotion + quietPeriod) - now);
+        // Retain a startup window when the app is silent. Once a semantic action
+        // has actually moved, follow its motion instead of imposing a 450ms pause.
+        long quiet = physical ? 80 : 64;
+        long minimum = physical || !observedMotion ? 450 : quiet;
+        return Math.max(0, Math.max(gestureEnd + minimum, lastMotion + quiet) - now);
     }
 }

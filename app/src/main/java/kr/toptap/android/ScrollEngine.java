@@ -17,8 +17,9 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import java.util.ArrayDeque;
 import java.util.List;
 import kr.toptap.android.core.ScrollCoast;
+import kr.toptap.android.core.ScrollBoundary;
 
-/** One bounded run, no idle work, no retained screen text, one action at a time. */
+/** One bounded run, no idle work or content logging, one action at a time. */
 public final class ScrollEngine {
     public interface Listener { void onState(boolean running, String message); }
     private final AccessibilityService service;
@@ -26,20 +27,24 @@ public final class ScrollEngine {
     private final Listener listener;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean running, jumped, atTop, haveProgress, awaitingGesture, semanticMoved;
-    private boolean smooth, coasting, coastRequiresMotion;
-    private int motionVersion, gestureMotionVersion;
+    private boolean smooth, coasting, physicalCoast;
+    private boolean upwardObserved;
     private final ScrollCoast coast = new ScrollCoast();
     private int gestures;
     private int initialRejections;
     private int targetMisses;
     private int generation, windowId, steps, stagnant, lastY, lastIndex, progressVersion, previousVersion;
     private String packageName, targetClass, targetId;
+    private AccessibilityNodeInfo targetNode;
+    private long lastGeometry;
+    private long coastGeometry;
+    private boolean haveGeometry;
     private final Rect targetBounds = new Rect();
     private String recentPackage, recentClass, recentId;
     private final Rect recentBounds = new Rect();
     private int recentWindow = -1, recentY = -1, recentIndex = -1;
     private long recentTime;
-    private boolean recentTop;
+    private int recentIdentity;
     private long started, stopped;
     private final Runnable nextStep = this::step;
 
@@ -65,16 +70,20 @@ public final class ScrollEngine {
             try {
                 targetClass = String.valueOf(target.getClassName()); targetId = target.getViewIdResourceName();
                 target.getBoundsInScreen(targetBounds);
+                targetNode = AccessibilityNodeInfo.obtain(target);
             } finally { target.recycle(); }
         } catch (IllegalStateException | SecurityException e) { listener.onState(false, "화면 정보를 다시 확인해 주세요"); return; }
         finally { if (root != null) root.recycle(); }
         running = true; generation++; jumped = false; atTop = false; haveProgress = false; awaitingGesture = false; semanticMoved = false; gestures = 0;
-        steps = 0; initialRejections = 0; targetMisses = 0; stagnant = 0; progressVersion = 0; previousVersion = 0; lastY = -1; lastIndex = -1;
+        steps = 0; initialRejections = 0; targetMisses = 0; stagnant = 0; progressVersion = 0; previousVersion = 0; lastY = -1; lastIndex = -1; haveGeometry = false;
         started = SystemClock.uptimeMillis();
-        smooth = settings.smoothScrolling(); coasting = false; motionVersion = 0;
+        smooth = settings.smoothScrolling(); coasting = false; upwardObserved = false;
         if (recentWindow == windowId && packageName.equals(recentPackage) && targetClass.equals(recentClass)
-                && java.util.Objects.equals(targetId, recentId) && Rect.intersects(targetBounds, recentBounds) && started - recentTime < 30_000) {
-            lastY = recentY; lastIndex = recentIndex; haveProgress = true; atTop = recentTop;
+                && targetNode.hashCode() == recentIdentity && java.util.Objects.equals(targetId, recentId)
+                && Rect.intersects(targetBounds, recentBounds) && started - recentTime < 1_000) {
+            // A recent positive position can identify a gesture-only viewport.
+            // A cached zero can never finish a new run: the app may have repositioned silently.
+            lastY = recentY; lastIndex = recentIndex; haveProgress = recentY > 0 || recentIndex > 0;
         }
         listener.onState(true, "맨 위로 이동 중 · 한 번 더 누르면 멈춰요");
         handler.post(nextStep);
@@ -84,6 +93,7 @@ public final class ScrollEngine {
         if ((service.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0)
             android.util.Log.d("TopTap", "steps="+steps+" elapsedMs="+(SystemClock.uptimeMillis()-started));
         running = false; awaitingGesture = false; coasting = false; generation++;
+        if (targetNode != null) { targetNode.recycle(); targetNode = null; }
         stopped = SystemClock.uptimeMillis();
         handler.removeCallbacksAndMessages(null);
         listener.onState(false, reason);
@@ -115,15 +125,21 @@ public final class ScrollEngine {
         AccessibilityNodeInfo source = null;
         try {
             source = event.getSource();
-            if (source == null || !matchesTarget(source)) return;
-            motionVersion++;
-            if (coasting) coast.motion(coastRequiresMotion ? Math.min(SystemClock.uptimeMillis(), event.getEventTime()) : SystemClock.uptimeMillis());
+            if (source == null || !matchesTarget(source) || event.getEventTime() < started) return;
             int y = event.getScrollY(); int index = event.getFromIndex();
             if (y >= 0 || index >= 0) {
-                if (!haveProgress || (y >= 0 && y != lastY) || (index >= 0 && index != lastIndex)) progressVersion++;
-                haveProgress = true; lastY = y; lastIndex = index;
+                if (!haveProgress || (y >= 0 && y != lastY) || (index >= 0 && index != lastIndex)) {
+                    progressVersion++;
+                    if (coasting) {
+                        coast.motion(Math.min(SystemClock.uptimeMillis(), event.getEventTime()));
+                        if (!physicalCoast) coastGeometry = geometry(source);
+                    }
+                }
+                haveProgress = true;
+                if (y >= 0) lastY = y;
+                if (index >= 0) lastIndex = index;
                 // Only a matching target's actual scroll event supplies boundary evidence.
-                atTop = (y == 0 && event.getMaxScrollY() > 0) || (index == 0 && event.getItemCount() > 0 && firstChildAtStart(source));
+                atTop = ScrollBoundary.atStart(y, event.getMaxScrollY(), index, event.getItemCount(), firstChildAtStart(source));
             }
         } catch (IllegalStateException | SecurityException ignored) { /* next step reacquires */ }
         finally { if (source != null) source.recycle(); }
@@ -137,9 +153,8 @@ public final class ScrollEngine {
             recentPackage = event.getPackageName() == null ? "" : event.getPackageName().toString();
             recentClass = String.valueOf(source.getClassName()); recentId = source.getViewIdResourceName();
             recentWindow = event.getWindowId(); source.getBoundsInScreen(recentBounds);
+            recentIdentity = source.hashCode();
             recentY = event.getScrollY(); recentIndex = event.getFromIndex(); recentTime = SystemClock.uptimeMillis();
-            recentTop = (recentY == 0 && event.getMaxScrollY() > 0)
-                || (recentIndex == 0 && event.getItemCount() > 0 && firstChildAtStart(source));
         } catch (IllegalStateException | SecurityException ignored) { recentWindow = -1; }
         finally { if (source != null) source.recycle(); }
     }
@@ -154,6 +169,10 @@ public final class ScrollEngine {
         } finally { child.recycle(); }
     }
     private boolean matchesTarget(AccessibilityNodeInfo node) {
+        // Node identity prevents an overlapping sibling with the same class/id from winning.
+        return targetNode != null && targetNode.equals(node) && node.getWindowId() == windowId;
+    }
+    private boolean matchesTargetShape(AccessibilityNodeInfo node) {
         if (!targetClass.equals(String.valueOf(node.getClassName()))) return false;
         if (targetId != null && !targetId.equals(node.getViewIdResourceName())) return false;
         Rect bounds = new Rect(); node.getBoundsInScreen(bounds);
@@ -170,11 +189,21 @@ public final class ScrollEngine {
             cancel("시간 제한에 도달했어요. 더 이동하려면 다시 눌러 주세요"); return;
         }
         if (coasting) {
+            try {
+                if (!physicalCoast && targetNode != null && targetNode.refresh()) {
+                    long current = geometry(targetNode);
+                    if (current != coastGeometry) {
+                        // Native animations can keep moving between sparse accessibility events.
+                        // Verify their geometry before replacing them with another action.
+                        coastGeometry = current; coast.motion(SystemClock.uptimeMillis());
+                    }
+                }
+            } catch (IllegalStateException | SecurityException e) {
+                coasting = false; retryTarget(); return;
+            }
             long delay = coast.remaining(SystemClock.uptimeMillis());
-            if (delay > 0) { handler.postDelayed(nextStep, Math.min(80, delay)); return; }
+            if (delay > 0) { handler.postDelayed(nextStep, Math.min(physicalCoast ? 80 : 40, delay)); return; }
             coasting = false;
-            if (atTop) { cancel("맨 위에 도착했어요"); return; }
-            if (coastRequiresMotion && motionVersion == gestureMotionVersion) { cancel("움직임이 확인되지 않아 멈췄어요"); return; }
         }
         if (awaitingGesture) { cancel("동작 응답이 없어 스크롤을 멈췄어요"); return; }
         AccessibilityNodeInfo root = null, target = null;
@@ -184,10 +213,44 @@ public final class ScrollEngine {
             if (root.getWindowId() != windowId || root.getPackageName() == null || !packageName.contentEquals(root.getPackageName())) {
                 cancel("화면이 바뀌어 스크롤을 멈췄어요"); return;
             }
-            target = findTarget(root);
-            if (target == null || !target.refresh() || !matchesTarget(target)) { retryTarget(); return; }
+            // Refresh the pinned viewport instead of walking up to 250 nodes after every fling.
+            target = AccessibilityNodeInfo.obtain(targetNode);
+            if (!target.refresh()) {
+                target.recycle(); target = findTarget(root, true);
+                if (target == null || !target.refresh()) { retryTarget(); return; }
+                targetNode.recycle(); targetNode = AccessibilityNodeInfo.obtain(target);
+                // A replacement view has no position evidence from the previous instance.
+                atTop = false; haveProgress = false; haveGeometry = false; upwardObserved = false;
+                lastY = -1; lastIndex = -1; stagnant = 0; jumped = false;
+                previousVersion = progressVersion;
+            }
+            if (!matchesTarget(target)) { retryTarget(); return; }
+            if (!target.isVisibleToUser() || !target.isEnabled() || target.isEditable()
+                    || target.getRangeInfo() != null || isHorizontal(target)) { cancel("스크롤 대상이 바뀌었어요"); return; }
+            target.getBoundsInScreen(targetBounds);
             targetMisses = 0;
-            if (atTop) { cancel("맨 위에 도착했어요"); return; }
+            boolean upward = has(target, AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+                || has(target, AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.getId())
+                || (android.os.Build.VERSION.SDK_INT >= 29 && has(target, AccessibilityNodeInfo.AccessibilityAction.ACTION_PAGE_UP.getId()));
+            if (upward) upwardObserved = true;
+            long geometry = geometry(target);
+            boolean moved = progressVersion != previousVersion || (haveGeometry && geometry != lastGeometry);
+            if (steps > 0) stagnant = moved ? 0 : stagnant + 1;
+            haveGeometry = true; lastGeometry = geometry; previousVersion = progressVersion;
+            if (atTop && !upward) { cancel("맨 위에 도착했어요"); return; }
+            if (stagnant >= 3) { cancel("더 이상 이동이 확인되지 않아 멈췄어요"); return; }
+            if (!upward && upwardObserved) {
+                // A fresh action list reaching its boundary overrides an older positive offset.
+                if (performSemanticScroll(target)) { steps++; semanticMoved = true; waitForMotion(false); return; }
+                cancel("더 이상 위로 이동할 수 없어요"); return;
+            }
+            if (atTop) {
+                // Some apps advertise upward actions even at their edge. Ask semantically
+                // before any physical pull; acceptance alone does not prove completion.
+                atTop = false;
+                if (performSemanticScroll(target)) { steps++; semanticMoved = true; waitForMotion(false); return; }
+                cancel("더 이상 위로 이동할 수 없어요"); return;
+            }
             if (!jumped) {
                 jumped = true;
                 if (fastEnd(target)) {
@@ -195,9 +258,6 @@ public final class ScrollEngine {
                 }
             }
             if (smooth) {
-                if (gestures >= 12) { cancel("더 이동하려면 상단을 다시 눌러 주세요"); return; }
-                boolean upward = has(target, AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
-                    || has(target, AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.getId());
                 // A short native finish avoids flinging hard into an already-nearby edge.
                 if (haveProgress && lastY > 0 && lastY < targetBounds.height() && performSemanticScroll(target)) {
                     steps++; semanticMoved = true; waitForMotion(false); return;
@@ -214,11 +274,6 @@ public final class ScrollEngine {
                 }
                 gestures++; swipe(target); return;
             }
-            if (steps > 0) {
-                stagnant = progressVersion == previousVersion ? stagnant + 1 : 0;
-                if (stagnant >= 5) { cancel("더 이상 이동이 확인되지 않아 멈췄어요"); return; }
-            }
-            previousVersion = progressVersion;
             if (performSemanticScroll(target)) {
                 // Chromium smooth-scroll needs time to settle. Reissuing every
                 // frame restarts its easing and makes long pages much slower.
@@ -236,6 +291,23 @@ public final class ScrollEngine {
     private void retryTarget() {
         if (targetMisses++ < 4) handler.postDelayed(nextStep, 60L << (targetMisses - 1));
         else cancel("스크롤 대상을 다시 연결하지 못했어요");
+    }
+    private long geometry(AccessibilityNodeInfo target) {
+        // Geometry/collection indices only; no screen text, screenshots, or idle polling.
+        long value = 1;
+        for (int i = 0; i < Math.min(3, target.getChildCount()); i++) {
+            AccessibilityNodeInfo child = target.getChild(i);
+            if (child == null) continue;
+            try {
+                if (!child.refresh()) continue;
+                Rect bounds = new Rect(); child.getBoundsInScreen(bounds);
+                AccessibilityNodeInfo.CollectionItemInfo item = child.getCollectionItemInfo();
+                value = value * 31 + bounds.top;
+                value = value * 31 + bounds.bottom;
+                value = value * 31 + (item == null ? -1 : item.getRowIndex());
+            } finally { child.recycle(); }
+        }
+        return value;
     }
     private boolean fastEnd(AccessibilityNodeInfo target) {
         boolean positionSupported = has(target, AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION.getId());
@@ -282,9 +354,10 @@ public final class ScrollEngine {
         }
         return null;
     }
-    private void waitForMotion(boolean requireMotion) {
-        coasting = true; coastRequiresMotion = requireMotion; coast.begin(SystemClock.uptimeMillis(), requireMotion);
-        handler.postDelayed(nextStep, 60);
+    private void waitForMotion(boolean physicalGesture) {
+        coasting = true; physicalCoast = physicalGesture; coastGeometry = lastGeometry;
+        coast.begin(SystemClock.uptimeMillis(), physicalGesture);
+        handler.postDelayed(nextStep, physicalGesture ? 60 : 16);
     }
     private boolean performSemanticScroll(AccessibilityNodeInfo target) {
         int up = AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.getId();
@@ -311,7 +384,6 @@ public final class ScrollEngine {
         path.moveTo(x, rect.top + rect.height() * .12f); path.lineTo(x, rect.top + rect.height() * .9f);
         GestureDescription gesture = new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, smooth ? 70 : 130)).build();
         final int token = generation; awaitingGesture = true; steps++;
-        gestureMotionVersion = motionVersion;
         boolean accepted = service.dispatchGesture(gesture, new AccessibilityService.GestureResultCallback() {
             @Override public void onCompleted(GestureDescription description) {
                 if (!running || token != generation) return;
@@ -345,9 +417,12 @@ public final class ScrollEngine {
             && !has(node, AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.getId());
     }
     private AccessibilityNodeInfo findTarget(AccessibilityNodeInfo root) {
+        return findTarget(root, false);
+    }
+    private AccessibilityNodeInfo findTarget(AccessibilityNodeInfo root, boolean replacing) {
         ArrayDeque<AccessibilityNodeInfo> queue = new ArrayDeque<>();
         queue.add(AccessibilityNodeInfo.obtain(root));
-        AccessibilityNodeInfo best = null; long bestScore = 0; int seen = 0;
+        AccessibilityNodeInfo best = null; long bestScore = 0; int seen = 0, replacements = 0;
         DisplayMetrics screen = service.getResources().getDisplayMetrics();
         try {
             while (!queue.isEmpty() && seen++ < 250) {
@@ -360,7 +435,15 @@ public final class ScrollEngine {
                     boolean scrollable = node.isScrollable() || verticalAction(node) || name.contains("WebView");
                     boolean candidate = node.isVisibleToUser() && node.isEnabled() && !horizontal && scrollable
                         && rect.intersect(0, 0, screen.widthPixels, screen.heightPixels) && rect.height() > 100 && rect.width() > 80;
-                    if (candidate && (!running || matchesTarget(node))) {
+                    if (candidate && (!running || (replacing ? matchesTargetShape(node) : matchesTarget(node)))) {
+                        if (replacing) replacements++;
+                        if (!running && recentWindow == windowId && recentIdentity == node.hashCode()
+                                && packageName.equals(recentPackage) && name.equals(recentClass)
+                                && SystemClock.uptimeMillis() - recentTime < 30_000
+                                && java.util.Objects.equals(recentId, node.getViewIdResourceName()) && Rect.intersects(rect, recentBounds)) {
+                            if (best != null) best.recycle();
+                            return AccessibilityNodeInfo.obtain(node);
+                        }
                         long area = (long) rect.width() * rect.height();
                         // Chromium can expose only downward actions even after scrolling down.
                         // Its virtual document still accepts upward actions; the larger native
@@ -373,19 +456,15 @@ public final class ScrollEngine {
                     // WebView can expose both a native viewport and a virtual document.
                     // Choose the one that actually supports upward scrolling, even if
                     // the other wrapper is a few pixels larger and only scrolls down.
-                    if (candidate && name.contains("WebView") && node.getChildCount() > 0) {
-                        AccessibilityNodeInfo child = node.getChild(0);
-                        if (child != null) {
-                            if (String.valueOf(child.getClassName()).contains("WebView")) queue.addLast(child);
-                            else child.recycle();
-                        }
-                    }
                     // Nested scrolling containers can implement actions their outer wrapper lacks.
-                    if (!name.contains("WebView") || !candidate) for (int i = 0; i < node.getChildCount() && queue.size() + seen < 250; i++) {
+                    for (int i = 0; i < node.getChildCount() && queue.size() + seen < 250; i++) {
                         AccessibilityNodeInfo child = node.getChild(i); if (child != null) queue.addLast(child);
                     }
                 } finally { node.recycle(); }
             }
+            // A rebuilt viewport can reconnect only when exactly one candidate matches.
+            // Overlapping siblings are ambiguous and must never inherit a gesture.
+            if (replacing && replacements != 1) { if (best != null) best.recycle(); return null; }
             return best;
         } catch (RuntimeException e) { if (best != null) best.recycle(); throw e; }
         finally { while (!queue.isEmpty()) queue.removeFirst().recycle(); }
