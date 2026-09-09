@@ -1,80 +1,54 @@
 # 탑탭 · TopTap
 
-갤럭시 화면 상단을 톡 눌러 현재 앱의 목록을 맨 위로 이동하는 네이티브 안드로이드 앱입니다. 한국어 UI와 오리지널 벡터 아이콘을 포함합니다.
+갤럭시의 **상태바 어디든 한 번 눌러 맨 위로** 이동하는 네이티브 Android 앱입니다. 상태바에는 터치 영역, 파란 선, 실행 중 색상을 그리지 않습니다.
 
-[설치용 APK 1.1.0](dist/TopTap-1.1.0-debug.apk) · [검증 기록](docs/VERIFICATION.md) · [앱 화면](docs/screenshots/home.png)
+[설치용 APK 1.2.0](dist/TopTap-1.2.0-debug.apk) · [검증 기록](docs/VERIFICATION.md) · [개인정보 안내](docs/PRIVACY.md)
+
+[실제 스크롤 녹화](docs/media/toptap-1.2-scroll-demo.mp4): 별도 테스트 앱의 350번째 항목에서 상태바를 한 번 눌러 맨 위로 이동하는 Android 16 에뮬레이터 화면입니다.
 
 ## 설치와 사용
 
-1. `dist/TopTap-1.1.0-debug.apk`를 휴대폰에 옮겨 설치합니다. 개인 기기 테스트용 서명 APK입니다. 1.0.0 위에 업데이트 설치하면 기존 설정이 유지됩니다.
-2. 앱을 열고 **탑탭 시작하기**를 누릅니다. 접근성 사용 설명을 읽고 동의한 뒤 Android 설정에서 **탑탭**을 직접 켭니다.
-3. 긴 목록을 내려 본 뒤 **왼쪽 상단의 파란 선**을 누릅니다. 이동 중 같은 동작을 반복하면 멈춥니다. 두 번 누르기 모드에서는 두 번 눌러 시작/중지합니다.
-4. 앱에서 **긴 목록에서 연습하기**로 먼저 확인할 수 있습니다.
-5. 갤럭시에서는 앱 정보 → 배터리 → **제한 없음**, 설정 → 배터리 → 백그라운드 사용 제한 → **절전 예외 앱**에 탑탭을 추가하면 절전으로 중단될 가능성을 줄일 수 있습니다. One UI마다 명칭이 다릅니다.
+1. APK를 설치합니다. 이전 버전 위에 업데이트할 수 있는 동일 서명의 테스트 빌드입니다.
+2. 앱에서 **탑탭 시작하기**를 눌러 설명에 동의하고, Android 접근성 설정에서 **탑탭**을 켭니다.
+3. 다른 앱을 내려 본 뒤 **상태바의 왼쪽·가운데·오른쪽 어디든 한 번** 누릅니다. 표시선은 없습니다. 다시 한 번 누르면 추가 스크롤을 중단합니다.
+4. 탑탭 화면을 닫거나 **최근 앱 → 모두 닫기**를 눌러도 사용할 수 있도록 실행 유지 서비스를 사용합니다. 접근성을 끄거나 일시정지하면 함께 종료합니다.
 
-직접 설치한 APK의 접근성 메뉴가 차단되면 앱 정보의 오른쪽 위 메뉴에서 **제한된 설정 허용**이 필요할 수 있습니다. 확인한 출처의 APK에만 허용하세요.
+직접 설치한 APK의 접근성이 차단되면 앱 정보 오른쪽 위 메뉴의 **제한된 설정 허용**이 필요할 수 있습니다. 확인한 출처의 APK에만 허용하세요. 갤럭시의 배터리 → 백그라운드 사용 제한에서 탑탭을 절전 예외에 추가하면 제조사 절전으로 끊기는 가능성을 줄일 수 있습니다. 명칭은 One UI 버전에 따라 다릅니다.
 
-접근성을 한 번 연결하면 **탑탭 화면을 켜 둘 필요가 없습니다.** 최근 앱 목록에서 탑탭을 닫아도 서비스가 연결된 동안 사용할 수 있습니다. Android 설정의 **강제 중지**, 접근성 권한 끄기, 앱 안의 일시정지는 별도 동작입니다.
+‘최근 앱 모두 닫기’와 **설정의 강제 중지 / 실행 중인 앱 목록의 중지**는 다릅니다. 명시적인 시스템 중지 후에도 계속 실행되는 기능은 제공하지 않습니다.
 
-## 부드럽게 올라가기 · 1.1.0
+## 1.2.0 변경
 
-탑탭 → **설정 → 부드럽게 올라가기**를 켜세요. 손으로 휙 밀듯 짧게 스와이프하고, 해당 앱의 관성 스크롤이 이어지도록 기다립니다. 움직이는 도중 다음 스와이프로 반복해서 끊지 않습니다. 기본값은 기존 방식이며, 이 옵션을 켰을 때만 관성 방식으로 바뀝니다.
+- **원터치 고정, 상태바 전체 너비.** 이전 버전의 두 번 터치·위치·너비·표시선 설정은 적용하지 않습니다.
+- **빠른 이동이 기본.** 앱이 제공하는 첫 행/맨 위 이동을 우선하고, 필요한 경우 짧은 스와이프와 앱의 관성으로 이어갑니다. 예전 부드러운 모드의 켜짐/꺼짐과 별도로 새 기본값을 적용합니다.
+- 중첩 스크롤 영역, 위쪽 페이지 이동만 제공하는 화면, 위쪽 동작 정보를 누락하는 세로 화면을 보완했습니다.
+- 창 전환 중 화면 정보가 잠시 사라질 때 제한적으로 재연결합니다. 상태바가 숨겨진 전체 화면에서는 터치를 가로채지 않습니다.
+- 최근 앱을 닫아도 유지되는 Android 포그라운드 세션, 실제 연결 상태 표시, 빠른 설정 타일의 일시정지/재개를 제공합니다.
 
-지원 여부와 속도는 대상 앱에 따라 달라집니다. 한 번에 최대 네 번 스와이프하고 설정한 실행 시간을 지킵니다. 다시 누르면 **추가 스와이프**를 중단합니다. 이미 시작된 앱의 관성은 잠시 이어질 수 있고, 해당 화면을 직접 터치하면 멈출 수 있습니다. 일부 화면의 당겨서 새로고침 제스처에 영향을 줄 수 있어 선택 기능으로 제공합니다.
+상태바를 아래로 드래그하면 알림창을 열고 오른쪽 1/3에서 드래그하면 빠른 설정을 엽니다. 길게 누르기·다중 터치·가로 드래그는 상단 이동으로 처리하지 않습니다.
 
-## 기능
+## 동작 범위
 
-- 상단 터치 위치·너비, 한 번/두 번 누르기, 표시선, 진동 설정.
-- 선택 가능한 관성 스크롤과 최근 앱에서 화면을 닫은 뒤 사용.
-- 앱이 지원하면 첫 행으로 바로 이동하고, 그 외에는 위로 스크롤을 반복.
-- 최대 실행 시간, 진행 없음 감지, 다시 눌러 중지, 앱·창 전환 및 잠금 시 중지.
-- 호환 스와이프는 사용자가 켰을 때만 식별된 스크롤 영역에서 제한적으로 실행.
-- 앱별 제외, 일시정지, 빠른 설정의 탑탭 타일.
-- 실제 접근성 연결 상태와 갤럭시 절전 설정 안내.
-- 인터넷·사진·연락처 권한, 광고, 분석 SDK, 서드파티 런타임 라이브러리 없음.
+접근성 스크롤 기능과 애니메이션은 대상 앱이 구현합니다. 어떤 앱은 바로 맨 위로 이동하고, 어떤 앱은 자체 애니메이션으로 이동합니다. **모든 앱의 속도와 애니메이션을 아이폰과 동일하게 강제하는 공통 Android API는 없습니다.** 실제 검사한 이동 시간, 프레임 사이 간격과 미검증 범위를 [검증 기록](docs/VERIFICATION.md)에서 확인할 수 있습니다.
 
-## 지원 범위와 한계
+- 일반 목록·사진 격자·WebView와 실제 Chrome에서 검증합니다. 게임·보안 화면·접근성 정보를 제공하지 않는 자체 렌더링 화면은 지원되지 않을 수 있습니다.
+- 한 실행의 제한 시간은 기본 12초, 최대 20초입니다. 아주 긴 화면에서 제한에 도달하면 다시 한 번 눌러 이어서 이동할 수 있습니다.
+- 다시 누르면 추가 동작을 멈춥니다. 이미 시작된 대상 앱의 관성은 잠시 이어질 수 있으며, 내용 화면을 직접 터치하면 멈출 수 있습니다.
+- 인터넷·사진·연락처·위치·카메라·마이크 권한과 광고/분석 SDK가 없습니다. Android 실행 유지 및 알림 관련 권한만 추가로 선언합니다. 실행 상태 알림은 Android의 알림 허용 상태에 따릅니다.
+- 삼성 실기기, 모든 One UI 버전, 모든 앱, 밤새 절전 상태를 검증했다는 뜻은 아닙니다. 스토어에 심사·게시한 상용 배포판이 아닙니다.
 
-- 최소 Android 8.0(API 26), compile/target SDK 36. 자동 검증 결과는 [검증 보고서](docs/VERIFICATION.md)를 참고하세요.
-- Android에는 다른 모든 앱에 ‘맨 위로’를 강제하는 공통 API가 없습니다. 보안 화면, 게임, 일부 자체 렌더링 화면, 앱이 접근성 스크롤 정보를 제공하지 않는 영역은 지원되지 않을 수 있습니다.
-- 상태 표시줄 전체를 가로채지 않습니다. 기본값은 작은 왼쪽 영역이며, 나머지 영역은 시스템 제스처용으로 남겨 둡니다. 터치 영역 안의 아래쪽 드래그는 알림창을, 화면 오른쪽 1/3의 영역에서는 빠른 설정을 여는 시스템 동작으로 변환합니다. 원래 드래그 이벤트를 재전송하는 방식은 아닙니다. Samsung One UI에서의 세부 제스처 동작은 실기기 검증이 필요합니다.
-- 카메라 구멍과 겹치면 터치 영역을 왼쪽/오른쪽으로 옮기세요. 외부 디스플레이와 폴더블 전환은 아직 검증하지 않았습니다.
-- 아주 긴 목록은 제한 시간(기본 12초, 최대 20초)에 도달하면 멈춥니다. 다시 누르면 이어서 이동합니다.
-- 호환 스와이프는 일부 앱에서 새로고침 등 앱 고유 제스처를 유발할 수 있어 기본값이 꺼짐입니다. 한 번에 최대 4회이며 화면·앱이 바뀌거나 취소되면 새 제스처를 보내지 않습니다. 이미 전송한 짧은 제스처는 완료될 수 있습니다.
-- 시스템이 관리하는 접근성 서비스이며 무한 재시작, wake lock, 주기적 keep-alive를 사용하지 않습니다. **강제 종료·권한 철회·제조사 절전 정책을 무시할 수 없습니다.** 재연결이 필요하면 앱의 도움말을 확인하세요.
+## 개발과 검증
 
-## 개발
-
-JDK 17 이상(검증 JDK 21), Android SDK 36, Build Tools 36.0.0을 준비합니다.
+JDK 17 이상, Android SDK 36, Build Tools 36.0.0이 필요합니다. 검증 환경은 JDK 21, Gradle 9.4.1, Android Gradle Plugin 9.2.1입니다. 최소 Android 8/API 26을 지원하도록 빌드합니다.
 
 ```sh
-# local.properties에 실제 SDK 위치 지정
-printf 'sdk.dir=/your/android/sdk\n' > local.properties
-./gradlew :app:assembleDebug :fixture:assembleDebug :app:lintDebug :fixture:lintDebug
-sh scripts/test-core.sh
-```
-
-또는 `sh scripts/build.sh`로 빌드·정적 검사·핵심 테스트와 `dist/` APK 복사를 한 번에 실행합니다. macOS에서는 설치된 JDK 17 이상을 선택합니다.
-
-APK 출력: `app/build/outputs/apk/debug/app-debug.apk`.
-
-재현 가능한 별도 테스트 앱은 `fixture/`에 있습니다. 사용자 배포 APK에는 포함되지 않습니다.
-
-```sh
-# 지정한 테스트 에뮬레이터의 TopTap 앱 데이터/설정을 바꿉니다.
-# 개인 기기를 지정하면 실행을 거부합니다.
+# local.properties: sdk.dir=/your/android/sdk
+sh scripts/build.sh
 python3 scripts/e2e.py --serial emulator-5580 --adb /your/android/sdk/platform-tools/adb
+python3 scripts/e2e.py --serial emulator-5582 --adb /your/android/sdk/platform-tools/adb
+python3 scripts/capture-ui.py --serial emulator-5582 --adb /your/android/sdk/platform-tools/adb
 ```
 
-핵심 구현은 `TopTapService.java`(영역·생명주기), `ScrollEngine.java`(스크롤·중지), `TapRecognizer.java`(터치 판별), `MainActivity.java`(설정·안내)입니다. 서비스 상태는 디스크 설정이 아닌 실제 연결 콜백으로 표시합니다. 디버그 빌드는 스크롤 상태 메시지만 Logcat `TopTap` 태그로 기록하며 화면 글·사진·입력값을 기록하지 않습니다.
+테스트는 **명시한 전용 에뮬레이터의** 앱 설정을 변경하고 최근 앱을 닫습니다. 개인 기기는 거부하며, 종료 시 접근성 서비스 목록을 복원합니다. Clear all 동작은 테스트 AVD의 Pixel Launcher 레이아웃을 사용합니다. Chrome은 설치되어 있고 계정 없이 최초 실행을 마친 상태여야 합니다. 로컬 기사와 위치 기록은 테스트 서버/fixture에만 존재하고 배포 APK에는 포함되지 않습니다.
 
-## 참고한 공식 문서
-
-- [Android 접근성 서비스](https://developer.android.com/guide/topics/ui/accessibility/service): 화면 구조 조회와 제스처 실행.
-- [AccessibilityService 생명주기](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService): 사용자가 설정에서 켜고 시스템이 연결을 관리.
-- [Accessibility overlay](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_ACCESSIBILITY_OVERLAY): 별도 SYSTEM_ALERT_WINDOW 권한 없이 접근성 서비스에 연결된 영역 사용.
-- [Scroll to position](https://developer.android.com/reference/android/view/accessibility/AccessibilityNodeInfo.AccessibilityAction#ACTION_SCROLL_TO_POSITION): 위젯의 행/열 스크롤 동작.
-- [스크롤 양 지정](https://developer.android.com/reference/android/view/accessibility/AccessibilityNodeInfo#ACTION_ARGUMENT_SCROLL_AMOUNT_FLOAT): 지원 위젯에서 한 번에 끝까지 이동.
-- [Samsung 절전 예외 설정](https://www.samsung.com/us/support/galaxy-battery/optimization/): 제조사 백그라운드 제한 안내.
-
-참고 앱은 [Tap Scroll - Perfect Scroll](https://play.google.com/store/apps/details?id=com.scroll.scrolltop.backtotop&hl=ko)이며 코드·브랜드·디자인은 복제하지 않았습니다.
+코드 구조와 공식 API 근거는 [구현 설명](docs/IMPLEMENTATION.md), 삼성 실기기에서 확인할 항목은 [QA 확인표](docs/QA-CHECKLIST.md)에 있습니다.

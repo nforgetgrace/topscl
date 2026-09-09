@@ -50,6 +50,8 @@ public final class MainActivity extends Activity {
         int offset=getIntent().getIntExtra("offset",120);
         getSharedPreferences("qa",MODE_PRIVATE).edit().putBoolean("ready",false).putString("mode",mode).commit();
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(0xfff5f7fb);
+        if(mode.equals("light_status"))getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        if(mode.equals("dark_status"))root.setBackgroundColor(0xff14213a);
         root.setOnApplyWindowInsetsListener((v,insets)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);}else v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());return insets;});
         status=new TextView(this);status.setTextSize(16);status.setPadding(dp(16),dp(12),dp(16),dp(12));root.addView(status);position(offset);
         TextView title=new TextView(this);title.setText("External QA · "+mode);title.setTextSize(20);title.setPadding(dp(16),dp(8),dp(16),dp(12));root.addView(title);
@@ -89,9 +91,27 @@ public final class MainActivity extends Activity {
                 int spacing=v instanceof ListView?((ListView)v).getDividerHeight():((GridView)v).getVerticalSpacing();
                 recordMotion((kind.equals("grid")?first/3:first)*(child.getHeight()+spacing)-offsetPx);
             }}});
-            if(mode.equals("direct"))list.setAccessibilityDelegate(new View.AccessibilityDelegate(){
+            if(mode.equals("fling_list"))list.setAccessibilityDelegate(new View.AccessibilityDelegate(){
+                @Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION);}
+                @Override public boolean performAccessibilityAction(View host,int action,Bundle args){if(action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION.getId())return false;return super.performAccessibilityAction(host,action,args);}});
+            if(mode.equals("direct") || mode.equals("nested"))list.setAccessibilityDelegate(new View.AccessibilityDelegate(){
                 @Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION);}
-                @Override public boolean performAccessibilityAction(View host,int action,Bundle args){if(action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION.getId()){list.setSelection(0);return true;}return super.performAccessibilityAction(host,action,args);}});
+                @Override public boolean performAccessibilityAction(View host,int action,Bundle args){if(action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION.getId()){list.setSelection(0);getSharedPreferences("qa",MODE_PRIVATE).edit().putBoolean("direct_used",true).apply();return true;}return super.performAccessibilityAction(host,action,args);}});
+            if(mode.equals("nested"))root.setAccessibilityDelegate(new View.AccessibilityDelegate(){
+                @Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.setScrollable(true);}});
+            if(mode.equals("page_only") && Build.VERSION.SDK_INT>=29)list.setAccessibilityDelegate(new View.AccessibilityDelegate(){
+                @Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){
+                    super.onInitializeAccessibilityNodeInfo(host,info);info.setScrollable(false);
+                    info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP);info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD);
+                    info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION);
+                    if(list.getFirstVisiblePosition()>0 || (list.getChildCount()>0 && list.getChildAt(0).getTop()<list.getPaddingTop()))info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_PAGE_UP);
+                }
+                @Override public boolean performAccessibilityAction(View host,int action,Bundle args){
+                    if(action==AccessibilityNodeInfo.AccessibilityAction.ACTION_PAGE_UP.getId()){list.smoothScrollBy(-list.getHeight(),160);getSharedPreferences("qa",MODE_PRIVATE).edit().putBoolean("page_used",true).apply();return true;}
+                    if(action==AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD || action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.getId()
+                            || action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION.getId())return false;
+                    return super.performAccessibilityAction(host,action,args);
+                }});
             if(mode.equals("granular") && Build.VERSION.SDK_INT>=35)list.setAccessibilityDelegate(new View.AccessibilityDelegate(){
                 @Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION);info.setGranularScrollingSupported(true);}
                 @Override public boolean performAccessibilityAction(View host,int action,Bundle args){if((action==AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD || action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.getId()) && args!=null && args.getFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_SCROLL_AMOUNT_FLOAT)==Float.POSITIVE_INFINITY){list.setSelection(0);getSharedPreferences("qa",MODE_PRIVATE).edit().putBoolean("granular_used",true).apply();return true;}return super.performAccessibilityAction(host,action,args);}});
@@ -99,5 +119,9 @@ public final class MainActivity extends Activity {
             list.postDelayed(()->getSharedPreferences("qa",MODE_PRIVATE).edit().putBoolean("ready",true).apply(),300);
         }
         setContentView(root);
+        if (mode.equals("immersive")) {
+            if(Build.VERSION.SDK_INT>=30)getWindow().getInsetsController().hide(WindowInsets.Type.statusBars());
+            else getWindow().setFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        }
     }
 }

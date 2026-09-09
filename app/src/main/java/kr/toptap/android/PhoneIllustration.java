@@ -20,7 +20,7 @@ final class PhoneIllustration extends View {
         p.setColor(0xffE0E8FD); canvas.drawCircle(160,90,78,p);
         rect(canvas,91,9,226,176,23,0xffD2DDF9); rect(canvas,85,2,219,180,23,Ui.INK);
         rect(canvas,91,9,213,177,18,Ui.WHITE); rect(canvas,137,15,168,21,4,Ui.INK);
-        rect(canvas,99,17,126,22,3,Ui.BLUE);
+        p.setColor(Ui.INK); p.setTextSize(7); canvas.drawText("9:41",99,22,p);
         rect(canvas,103,40,171,47,3,Ui.INK); rect(canvas,103,55,192,60,2,0xffD8DFEA);
         rect(canvas,103,68,200,112,9,Ui.PALE);
         rect(canvas,112,77,140,103,6,0xffBACBF8); rect(canvas,149,79,190,84,2,0xff93ABE8); rect(canvas,149,92,180,97,2,0xffC0CFF3);

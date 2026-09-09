@@ -25,12 +25,12 @@
 ## Information architecture
 - Primary navigation: home / settings / help via simple tabs.
 - Core routes/screens: status and setup; touch and compatibility controls; reliability and privacy; long-list practice.
-- Settings begin with the opt-in “부드럽게 올라가기” switch and explain inertia/cancellation. Help distinguishes closing the app screen from force-stop.
+- Settings explain the default “빠르고 부드럽게” mode and cancellation. Help distinguishes recent-apps Clear all from explicit system Stop.
 - Content hierarchy: service state → primary action → usage preview → tuning and health.
 
 ## Design principles
 - Make the current service state truthful and actionable.
-- A small top-left activation region preserves the rest of the status bar for native gestures.
+- The entire status bar accepts a single tap. The trigger renders no pixels or press feedback. Downward drags open the system shade.
 - Tradeoffs: custom drawing for decorative art; real platform controls and text for accessible interaction.
 
 ## Visual language
@@ -56,8 +56,8 @@
 
 ## Responsive behavior
 - Supported breakpoints/devices: Android 8+ phones and tablets, portrait and landscape.
-- Layout adaptations: scrollable content, maximum readable width, system bar/cutout insets, large font reflow.
-- Touch/hover differences: 48dp minimum ordinary controls; top trigger is intentionally status-bar-sized and adjustable.
+- Layout adaptations: scrollable content, maximum readable width, system bar/cutout insets, large font reflow. No touch-width, position, marker, or double-tap controls.
+- Touch/hover differences: 48dp minimum ordinary controls; top trigger spans the real status bar and becomes non-touchable when that bar is hidden.
 
 ## Interaction states
 - Loading: short connection wait state, never claim connection solely from a stored setting.
@@ -75,7 +75,7 @@
 ## Implementation constraints
 - Framework/styling system: Java + Android platform UI, no third-party runtime libraries.
 - Design-token constraints: use the color/spacing contract above.
-- Performance constraints: event-driven service; bounded scans/runs, no wake lock, no polling while idle.
+- Performance constraints: event-driven service; bounded scans/runs, no wake lock, no polling while idle; a visible Android foreground session maintains the explicitly enabled feature after Clear all.
 - Compatibility constraints: accessibility support varies; OEM status bar and battery handling require hardware validation.
 - Test/screenshot expectations: emulator screenshots, lint/build, deterministic core tests and external fixture e2e.
 

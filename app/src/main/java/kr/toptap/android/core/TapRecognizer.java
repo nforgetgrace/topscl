@@ -6,8 +6,7 @@ public final class TapRecognizer {
     private final float slop;
     private boolean tracking, moved;
     private float downX, downY;
-    private long downAt, lastTapAt = -1;
-    private float lastTapX, lastTapY;
+    private long downAt;
     public TapRecognizer(float slop) { this.slop = Math.max(1, slop); }
     public void down(float x, float y, long time) {
         tracking = true; moved = false; downX = x; downY = y; downAt = time;
@@ -20,18 +19,13 @@ public final class TapRecognizer {
         }
         return Result.NONE;
     }
-    public Result up(float x, float y, long time, boolean doubleTap) {
+    public Result up(float x, float y, long time) {
         if (!tracking) return Result.NONE;
         tracking = false;
         if (moved || Math.hypot(x - downX, y - downY) > slop || time - downAt > 280) {
-            lastTapAt = -1; return Result.NONE;
+            return Result.NONE;
         }
-        if (!doubleTap) { lastTapAt = -1; return Result.TAP; }
-        if (lastTapAt >= 0 && time - lastTapAt <= 350 && Math.hypot(x - lastTapX, y - lastTapY) <= slop * 3) {
-            lastTapAt = -1; return Result.TAP;
-        }
-        lastTapAt = time; lastTapX = x; lastTapY = y;
-        return Result.NONE;
+        return Result.TAP;
     }
-    public void cancel() { tracking = false; moved = false; lastTapAt = -1; }
+    public void cancel() { tracking = false; moved = false; }
 }

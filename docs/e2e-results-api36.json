@@ -3,32 +3,32 @@
   "android": "16",
   "suite": "full",
   "passed": true,
-  "apk_sha256": "cdaccbb0ba6b564f3571d13a5b9a05c1066ad813e275d94e3bbc229996fe2fb6",
+  "apk_sha256": "42558b6a3cf21cfd0ed8cea72a287579d219cf7ab4b563dbb29157b30084fa8a",
   "tests": [
     {
       "test": "cross-app direct returns to actual top",
       "result": "PASS",
-      "seconds": 2.05
+      "seconds": 2.06
     },
     {
       "test": "cross-app granular returns to actual top",
       "result": "PASS",
-      "seconds": 2.11
+      "seconds": 2.09
     },
     {
       "test": "cross-app list returns to actual top",
       "result": "PASS",
-      "seconds": 4.02
+      "seconds": 4.06
     },
     {
       "test": "cross-app grid returns to actual top",
       "result": "PASS",
-      "seconds": 2.63
+      "seconds": 2.62
     },
     {
       "test": "cross-app web returns to actual top",
       "result": "PASS",
-      "seconds": 6.68
+      "seconds": 6.39
     },
     {
       "test": "horizontal-only carousel unchanged",
@@ -38,7 +38,7 @@
     {
       "test": "range control value is never adjusted",
       "result": "PASS",
-      "seconds": 2.17
+      "seconds": 2.2
     },
     {
       "test": "gesture fallback is disabled by default",
@@ -48,32 +48,32 @@
     {
       "test": "opt-in gesture fallback scrolls identified viewport",
       "result": "PASS",
-      "seconds": 2.53
+      "seconds": 2.66
     },
     {
       "test": "very long web respects time budget and resumes on next tap",
       "result": "PASS",
-      "seconds": 14.18
+      "seconds": 14.23
     },
     {
       "test": "pause removes overlay and disables trigger",
       "result": "PASS",
-      "seconds": 2.76
+      "seconds": 2.7
     },
     {
       "test": "excluded app untouched",
       "result": "PASS",
-      "seconds": 2.67
+      "seconds": 2.69
     },
     {
-      "test": "double-tap mode ignores one tap",
+      "test": "old two-tap and narrow-region settings migrate to one tap",
       "result": "PASS",
-      "seconds": 4.99
+      "seconds": 2.25
     },
     {
       "test": "trigger downward drag opens shade without scrolling",
       "result": "PASS",
-      "seconds": 3.54
+      "seconds": 3.53
     },
     {
       "test": "second activation cancels ongoing scroll",
@@ -83,37 +83,80 @@
     {
       "test": "changed window does not inherit previous scroll",
       "result": "PASS",
-      "seconds": 8.19
+      "seconds": 8.25
     },
     {
       "test": "OS rebind after process death and scrolling recovered",
       "result": "PASS",
-      "seconds": 4.96
+      "seconds": 5.27
     },
     {
       "test": "screen off removes trigger; unlock restores it",
       "result": "PASS",
-      "seconds": 4.27
+      "seconds": 4.53
     },
     {
       "test": "permission revocation removes overlay",
       "result": "PASS",
-      "seconds": 0.1
+      "seconds": 0.06
     },
     {
-      "test": "smooth list glides after release and reaches actual top",
+      "test": "fast list reaches actual top with measured motion",
       "result": "PASS",
-      "seconds": 7.65
+      "seconds": 5.6,
+      "measurements": {
+        "motion_kind": "animated",
+        "animation_ms": 2000,
+        "max_frame_gap_ms": 19,
+        "injected_swipes": 0,
+        "settled_position": 0
+      }
     },
     {
-      "test": "smooth grid glides after release and reaches actual top",
+      "test": "fast grid reaches actual top with measured motion",
       "result": "PASS",
-      "seconds": 5.34
+      "seconds": 4.16,
+      "measurements": {
+        "motion_kind": "animated",
+        "animation_ms": 666,
+        "max_frame_gap_ms": 19,
+        "injected_swipes": 0,
+        "settled_position": 0
+      }
     },
     {
-      "test": "smooth web glides after release and reaches actual top",
+      "test": "fast web reaches actual top with measured motion",
       "result": "PASS",
-      "seconds": 6.29
+      "seconds": 5.93,
+      "measurements": {
+        "motion_kind": "instant_native",
+        "settled_position": 0,
+        "injected_swipes": 0
+      }
+    },
+    {
+      "test": "fast fling_list reaches actual top with measured motion",
+      "result": "PASS",
+      "seconds": 4.49,
+      "measurements": {
+        "motion_kind": "animated",
+        "animation_ms": 866,
+        "max_frame_gap_ms": 19,
+        "injected_swipes": 2,
+        "settled_position": 0
+      }
+    },
+    {
+      "test": "deep gesture-only list reaches actual top with measured motion",
+      "result": "PASS",
+      "seconds": 5.35,
+      "measurements": {
+        "motion_kind": "animated",
+        "animation_ms": 1800,
+        "max_frame_gap_ms": 19,
+        "injected_swipes": 4,
+        "settled_position": 0
+      }
     },
     {
       "test": "smooth list already at top receives no physical swipe",
@@ -123,22 +166,22 @@
     {
       "test": "smooth web already at top receives no physical swipe",
       "result": "PASS",
-      "seconds": 3.1
+      "seconds": 3.09
     },
     {
       "test": "smooth cancel stops sending additional gestures",
       "result": "PASS",
-      "seconds": 4.83
+      "seconds": 4.74
     },
     {
       "test": "smooth immediate second tap does not restart a cancelled stroke",
       "result": "PASS",
-      "seconds": 4.66
+      "seconds": 4.55
     },
     {
-      "test": "smooth double-tap mode stops without restarting a cancelled stroke",
+      "test": "single stop tap works with a legacy two-tap preference",
       "result": "PASS",
-      "seconds": 4.33
+      "seconds": 4.35
     },
     {
       "test": "smooth context change never sends a gesture to new window",
@@ -148,9 +191,138 @@
     {
       "test": "closing TopTap in recent apps keeps background scrolling available",
       "result": "PASS",
-      "seconds": 6.05
+      "seconds": 6.38
+    },
+    {
+      "test": "fast mode uses native end action for direct",
+      "result": "PASS",
+      "seconds": 2.32,
+      "measurements": {
+        "seconds_to_top": 0.441
+      }
+    },
+    {
+      "test": "fast mode uses native end action for granular",
+      "result": "PASS",
+      "seconds": 2.32,
+      "measurements": {
+        "seconds_to_top": 0.443
+      }
+    },
+    {
+      "test": "fast mode uses native end action for nested",
+      "result": "PASS",
+      "seconds": 2.3,
+      "measurements": {
+        "seconds_to_top": 0.437
+      }
+    },
+    {
+      "test": "page-only accessibility action is supported",
+      "result": "PASS",
+      "seconds": 2.57
+    },
+    {
+      "test": "one tap works at fifteen positions across the full status bar",
+      "result": "PASS",
+      "seconds": 22.53,
+      "measurements": {
+        "tap_locations": 15,
+        "status_bar_height": 128
+      }
+    },
+    {
+      "test": "user-enabled session is foreground without notification permission",
+      "result": "PASS",
+      "seconds": 1.94
+    },
+    {
+      "test": "real recent-apps Clear all preserves scrolling for three cycles",
+      "result": "PASS",
+      "seconds": 22.9,
+      "measurements": {
+        "clear_all_cycles": 3
+      }
+    },
+    {
+      "test": "status-bar pixels match stock both idle and scrolling",
+      "result": "PASS",
+      "seconds": 22.7,
+      "measurements": {
+        "status_bar_height": 128,
+        "compared_rgba_bytes": 552960,
+        "idle_changed_bytes": 0,
+        "scrolling_changed_bytes": 0
+      }
+    },
+    {
+      "test": "status-bar pixels preserve light_status appearance",
+      "result": "PASS",
+      "seconds": 6.59,
+      "measurements": {
+        "status_bar_height": 128,
+        "compared_rgba_bytes": 552960,
+        "idle_changed_bytes": 0,
+        "scrolling_changed_bytes": 0
+      }
+    },
+    {
+      "test": "status-bar pixels preserve dark_status appearance",
+      "result": "PASS",
+      "seconds": 6.61,
+      "measurements": {
+        "status_bar_height": 128,
+        "compared_rgba_bytes": 552960,
+        "idle_changed_bytes": 0,
+        "scrolling_changed_bytes": 0
+      }
+    },
+    {
+      "test": "default mode handles a vertical viewport with no upward actions",
+      "result": "PASS",
+      "seconds": 2.7
+    },
+    {
+      "test": "upgrade ignores the old disabled smooth-mode preference",
+      "result": "PASS",
+      "seconds": 2.24
+    },
+    {
+      "test": "saved enable flag cannot activate scrolling without local consent",
+      "result": "PASS",
+      "seconds": 2.93
+    },
+    {
+      "test": "landscape keeps the entire status bar usable with one tap",
+      "result": "PASS",
+      "seconds": 6.87
+    },
+    {
+      "test": "quick settings pause stops the session and resume restores scrolling",
+      "result": "PASS",
+      "seconds": 6.6
+    },
+    {
+      "test": "explicit system Stop still stops the entire app",
+      "result": "PASS",
+      "seconds": 4.06
+    },
+    {
+      "test": "fullscreen content is not intercepted and the status bar recovers",
+      "result": "PASS",
+      "seconds": 6.39
+    },
+    {
+      "test": "real Chrome local article reaches document top within two seconds",
+      "result": "PASS",
+      "seconds": 5.67,
+      "measurements": {
+        "seconds_to_top": 0.318,
+        "motion_kind": "instant_native",
+        "frames": 1,
+        "max_frame_gap_ms": 0,
+        "final_scroll_y": 0
+      }
     }
-  ],
-  "version": "1.1.0",
-  "execution": "one TopTap test emulator at a time"
+  ]
 }

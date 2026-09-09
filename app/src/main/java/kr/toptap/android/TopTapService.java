@@ -9,9 +9,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
@@ -38,11 +35,14 @@ public final class TopTapService extends AccessibilityService implements SharedP
     private boolean registered;
     private long gestureSequence;
     private String homePackage = "";
-    private final Runnable refresh = this::refreshOverlay;
+    private boolean refreshPending, rootUnavailable;
+    private int rootRetries;
+    private int activeWindowId = -1, overlayWindowId = -1;
+    private final Runnable refresh = () -> { refreshPending = false; refreshOverlay(); };
     private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
-                engine.cancel("화면이 꺼져 스크롤을 멈췄어요"); removeOverlay();
+                if (engine != null) engine.cancel("화면이 꺼져 스크롤을 멈췄어요"); removeOverlay();
             } else scheduleRefresh();
         }
     };
@@ -69,13 +69,14 @@ public final class TopTapService extends AccessibilityService implements SharedP
         registered = true;
         ServiceStatus.connected = true;
         ServiceStatus.message = settings.enabled() ? "연결됐어요. 화면 상단을 톡 눌러 보세요" : "일시정지 중이에요";
-        refreshOverlay(); updateTile();
+        refreshOverlay(); updateTile(); SessionService.sync(this);
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
         if (engine == null || event == null) return;
         engine.onAccessibilityEvent(event);
-        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || event.getEventType() == AccessibilityEvent.TYPE_WINDOWS_CHANGED) scheduleRefresh();
+        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || event.getEventType() == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                || (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && trigger == null)) scheduleRefresh();
     }
     @Override public void onInterrupt() { if (engine != null) engine.cancel("다른 접근성 동작으로 스크롤이 중단됐어요"); }
     @Override public void onConfigurationChanged(Configuration config) {
@@ -86,41 +87,64 @@ public final class TopTapService extends AccessibilityService implements SharedP
     @Override public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
         gestureSequence++;
         if (engine != null) engine.cancel(settings.enabled() ? "설정을 적용했어요" : "일시정지 중이에요");
-        removeOverlay(); scheduleRefresh(); updateTile();
+        removeOverlay(); scheduleRefresh(); updateTile(); SessionService.sync(this);
     }
-    private void scheduleRefresh() { handler.removeCallbacks(refresh); handler.postDelayed(refresh, 80); }
+    private void scheduleRefresh() {
+        rootRetries = 0;
+        // Throttle rather than debounce: a stream of content events must not starve reattachment.
+        if (!refreshPending) { refreshPending = true; handler.postDelayed(refresh, 80); }
+    }
     private void updateTile() { TileService.requestListeningState(this, new ComponentName(this, TopTapTileService.class)); }
+    private void retryOverlay() {
+        if (rootRetries < 4 && !refreshPending) {
+            refreshPending = true; handler.postDelayed(refresh, 100L << rootRetries++);
+        }
+    }
 
     private boolean usableScreen() {
+        rootUnavailable = false;
         if (settings == null || !settings.enabled()) return false;
         PowerManager power = getSystemService(PowerManager.class);
         KeyguardManager keyguard = getSystemService(KeyguardManager.class);
         if (!power.isInteractive() || keyguard.isKeyguardLocked()) return false;
         AccessibilityNodeInfo root = null;
         try {
-            root = getRootInActiveWindow();
-            if (root == null || root.getPackageName() == null) return false;
+            root = ActiveWindow.root(this);
+            if (root == null || root.getPackageName() == null) { rootUnavailable = true; return false; }
             String pkg = root.getPackageName().toString();
+            activeWindowId = root.getWindowId();
             return !settings.isExcluded(pkg) && !pkg.equals(homePackage) && !isProtectedPackage(pkg);
         } catch (IllegalStateException | SecurityException ignored) { return false; }
         finally { if (root != null) root.recycle(); }
     }
     static boolean isProtectedPackage(String pkg) {
-        return pkg.equals("com.android.systemui") || pkg.equals("com.android.settings") || pkg.equals("android")
+        return pkg.equals("com.android.systemui") || pkg.equals("android")
             || pkg.contains("permissioncontroller") || pkg.contains("packageinstaller");
     }
     @android.annotation.SuppressLint("RtlHardcoded") // Activation positions refer to physical screen edges, regardless of text direction.
     private void refreshOverlay() {
         if (!usableScreen()) {
-            if (engine != null && engine.isRunning()) engine.cancel("화면이 바뀌어 스크롤을 멈췄어요");
-            removeOverlay(); return;
+            if (!rootUnavailable && engine != null && engine.isRunning()) engine.cancel("화면이 바뀌어 스크롤을 멈췄어요");
+            removeOverlay();
+            if (rootUnavailable) retryOverlay();
+            return;
         }
-        if (trigger != null) { trigger.setVisibility(View.VISIBLE); return; }
+        if (trigger != null && overlayWindowId != activeWindowId) removeOverlay();
+        if (trigger != null) {
+            // Overlay root insets omit the bar even when it is visible. Display window metrics
+            // reflect the foreground app's actual fullscreen state.
+            boolean visible = Build.VERSION.SDK_INT < 30 || windows.getCurrentWindowMetrics().getWindowInsets().isVisible(android.view.WindowInsets.Type.statusBars());
+            WindowManager.LayoutParams params = (WindowManager.LayoutParams)trigger.getLayoutParams();
+            int flags = visible ? params.flags & ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE : params.flags | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+            if (params.flags != flags) { params.flags = flags; windows.updateViewLayout(trigger, params); }
+            // Keep receiving insets while fullscreen; only touch interception is disabled.
+            trigger.setVisibility(View.VISIBLE); ServiceStatus.overlayVisible = visible;
+            if (!visible && engine != null) engine.cancel("상태바가 숨겨져 스크롤을 멈췄어요");
+            return;
+        }
         DisplayMetrics metrics = new DisplayMetrics();
         windows.getDefaultDisplay().getRealMetrics(metrics);
-        int width = Math.min(dp(settings.widthDp()), metrics.widthPixels / 2);
-        int inset = dp(12);
-        int x = settings.position() == 0 ? inset : settings.position() == 2 ? metrics.widthPixels - width - inset : (metrics.widthPixels - width) / 2;
+        int width = metrics.widthPixels;
         int height = dp(24);
         if (Build.VERSION.SDK_INT >= 30) height = Math.max(height, windows.getCurrentWindowMetrics().getWindowInsets().getInsetsIgnoringVisibility(android.view.WindowInsets.Type.statusBars()).top);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(width, Math.max(dp(20), height),
@@ -128,11 +152,12 @@ public final class TopTapService extends AccessibilityService implements SharedP
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | Gravity.LEFT; params.x = x; params.y = 0;
+        params.gravity = Gravity.TOP | Gravity.LEFT; params.x = 0; params.y = 0;
         params.setTitle("TopTap trigger");
         if (Build.VERSION.SDK_INT >= 28) params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         TriggerView candidate = new TriggerView(this, metrics.widthPixels);
         candidate.setOnApplyWindowInsetsListener((view, insets) -> {
+            if (Build.VERSION.SDK_INT >= 30 && trigger == view) scheduleRefresh();
             if (Build.VERSION.SDK_INT < 30 && insets.getSystemWindowInsetTop() > 0 && trigger == view) {
                 WindowManager.LayoutParams current = (WindowManager.LayoutParams) view.getLayoutParams();
                 int top = insets.getSystemWindowInsetTop();
@@ -140,11 +165,12 @@ public final class TopTapService extends AccessibilityService implements SharedP
             }
             return insets;
         });
-        try { windows.addView(candidate, params); trigger = candidate; ServiceStatus.overlayVisible = true; ServiceStatus.overlayError = false; }
+        try { windows.addView(candidate, params); trigger = candidate; overlayWindowId = activeWindowId; ServiceStatus.overlayVisible = true; ServiceStatus.overlayError = false; }
         catch (WindowManager.BadTokenException | IllegalStateException | SecurityException e) {
             ServiceStatus.overlayVisible = false;
             ServiceStatus.overlayError = true;
             ServiceStatus.message = "터치 영역을 연결하지 못했어요. 접근성을 껐다 켜 주세요";
+            retryOverlay();
         }
     }
     private int dp(float value) { return Math.round(value * getResources().getDisplayMetrics().density); }
@@ -155,14 +181,17 @@ public final class TopTapService extends AccessibilityService implements SharedP
             trigger = null;
         }
         ServiceStatus.overlayVisible = false;
+        overlayWindowId = -1;
     }
     private void cleanup() {
         gestureSequence++;
         handler.removeCallbacksAndMessages(null);
+        refreshPending = false;
         if (engine != null) { engine.destroy(); engine = null; }
         if (settings != null) settings.prefs.unregisterOnSharedPreferenceChangeListener(this);
         if (registered) { unregisterReceiver(screenReceiver); registered = false; }
         removeOverlay(); ServiceStatus.connected = false; ServiceStatus.scrolling = false; ServiceStatus.overlayError = false;
+        SessionService.sync(this);
         ServiceStatus.message = "접근성 연결을 확인해 주세요";
         updateTile();
     }
@@ -171,12 +200,10 @@ public final class TopTapService extends AccessibilityService implements SharedP
 
     private final class TriggerView extends View {
         final TapRecognizer recognizer = new TapRecognizer(ViewConfiguration.get(TopTapService.this).getScaledTouchSlop());
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int screenWidth;
         private float downX;
         private boolean shadeDrag;
         private boolean stopOnTap;
-        private long stopIntentAt;
         private long touchSequence;
         private boolean canOpenShade() {
             // This explicitly requested system action does not need a readable app
@@ -187,11 +214,7 @@ public final class TopTapService extends AccessibilityService implements SharedP
         TriggerView(Context context, int screenWidth) {
             super(context); this.screenWidth = screenWidth;
             setContentDescription("맨 위로 스크롤"); setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES); setClickable(true);
-        }
-        @Override protected void onDraw(Canvas canvas) {
-            if (!settings.showIndicator()) return;
-            paint.setColor(ServiceStatus.scrolling ? Color.rgb(24,114,76) : Color.rgb(49,91,238));
-            canvas.drawRoundRect(dp(10), getHeight() - dp(3), getWidth() - dp(10), getHeight(), dp(2), dp(2), paint);
+            setWillNotDraw(true); // No background, ripple, marker, or running-state pixels.
         }
         @Override public boolean performClick() {
             super.performClick();
@@ -206,13 +229,13 @@ public final class TopTapService extends AccessibilityService implements SharedP
                 case MotionEvent.ACTION_DOWN -> {
                     touchSequence = ++gestureSequence; shadeDrag = false; downX = event.getRawX();
                     if (engine != null && engine.wasRunningAt(event.getEventTime())) {
-                        stopOnTap = true; stopIntentAt = event.getEventTime();
-                    } else if (!settings.doubleTap() || event.getEventTime() - stopIntentAt > 350) stopOnTap = false;
+                        stopOnTap = true;
+                    } else stopOnTap = false;
                     recognizer.down(event.getRawX(), event.getRawY(), event.getEventTime());
                 }
                 case MotionEvent.ACTION_MOVE -> { if (recognizer.move(event.getRawX(), event.getRawY()) == TapRecognizer.Result.DRAG_DOWN) shadeDrag = true; }
                 case MotionEvent.ACTION_UP -> result = shadeDrag || recognizer.move(event.getRawX(), event.getRawY()) == TapRecognizer.Result.DRAG_DOWN
-                    ? TapRecognizer.Result.DRAG_DOWN : recognizer.up(event.getRawX(), event.getRawY(), event.getEventTime(), settings.doubleTap());
+                    ? TapRecognizer.Result.DRAG_DOWN : recognizer.up(event.getRawX(), event.getRawY(), event.getEventTime());
                 case MotionEvent.ACTION_CANCEL -> {
                     // Edge transfer may coalesce the final MOVE into CANCEL.
                     if (shadeDrag || recognizer.move(event.getRawX(), event.getRawY()) == TapRecognizer.Result.DRAG_DOWN) result = TapRecognizer.Result.DRAG_DOWN;
@@ -228,7 +251,7 @@ public final class TopTapService extends AccessibilityService implements SharedP
                 stopOnTap = false;
             }
             if (result == TapRecognizer.Result.DRAG_DOWN) {
-                engine.cancel("알림창을 열었어요");
+                if (engine != null) engine.cancel("알림창을 열었어요");
                 setVisibility(View.INVISIBLE);
                 int action = downX >= screenWidth * 0.67f ? GLOBAL_ACTION_QUICK_SETTINGS : GLOBAL_ACTION_NOTIFICATIONS;
                 final long sequence = touchSequence;
@@ -241,7 +264,7 @@ public final class TopTapService extends AccessibilityService implements SharedP
                     if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0)
                         android.util.Log.d("TopTap", "shade opened=" + opened);
                 }, event.getActionMasked() == MotionEvent.ACTION_CANCEL ? 250 : 40);
-                handler.removeCallbacks(refresh); handler.postDelayed(refresh, 600);
+                handler.removeCallbacks(refresh); refreshPending = true; handler.postDelayed(refresh, 600);
             }
             return true;
         }
