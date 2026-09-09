@@ -25,6 +25,7 @@
 ## Information architecture
 - Primary navigation: home / settings / help via simple tabs.
 - Core routes/screens: status and setup; touch and compatibility controls; reliability and privacy; long-list practice.
+- Settings begin with the opt-in “부드럽게 올라가기” switch and explain inertia/cancellation. Help distinguishes closing the app screen from force-stop.
 - Content hierarchy: service state → primary action → usage preview → tuning and health.
 
 ## Design principles

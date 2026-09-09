@@ -3,103 +3,154 @@
   "android": "15",
   "suite": "full",
   "passed": true,
+  "apk_sha256": "cdaccbb0ba6b564f3571d13a5b9a05c1066ad813e275d94e3bbc229996fe2fb6",
   "tests": [
     {
       "test": "cross-app direct returns to actual top",
       "result": "PASS",
-      "seconds": 3.45
+      "seconds": 2.14
     },
     {
       "test": "cross-app granular returns to actual top",
       "result": "PASS",
-      "seconds": 2.9
+      "seconds": 2.06
     },
     {
       "test": "cross-app list returns to actual top",
       "result": "PASS",
-      "seconds": 7.1
+      "seconds": 3.98
     },
     {
       "test": "cross-app grid returns to actual top",
       "result": "PASS",
-      "seconds": 4.86
+      "seconds": 2.6
     },
     {
       "test": "cross-app web returns to actual top",
       "result": "PASS",
-      "seconds": 8.0
+      "seconds": 6.6
     },
     {
       "test": "horizontal-only carousel unchanged",
       "result": "PASS",
-      "seconds": 4.03
+      "seconds": 2.14
     },
     {
       "test": "range control value is never adjusted",
       "result": "PASS",
-      "seconds": 3.65
+      "seconds": 2.18
     },
     {
       "test": "gesture fallback is disabled by default",
       "result": "PASS",
-      "seconds": 8.45
+      "seconds": 3.48
     },
     {
       "test": "opt-in gesture fallback scrolls identified viewport",
       "result": "PASS",
-      "seconds": 6.77
+      "seconds": 2.48
     },
     {
       "test": "very long web respects time budget and resumes on next tap",
       "result": "PASS",
-      "seconds": 20.11
+      "seconds": 14.2
     },
     {
       "test": "pause removes overlay and disables trigger",
       "result": "PASS",
-      "seconds": 5.15
+      "seconds": 2.71
     },
     {
       "test": "excluded app untouched",
       "result": "PASS",
-      "seconds": 5.03
+      "seconds": 2.64
     },
     {
       "test": "double-tap mode ignores one tap",
       "result": "PASS",
-      "seconds": 10.87
+      "seconds": 4.84
     },
     {
       "test": "trigger downward drag opens shade without scrolling",
       "result": "PASS",
-      "seconds": 7.49
+      "seconds": 3.52
     },
     {
       "test": "second activation cancels ongoing scroll",
       "result": "PASS",
-      "seconds": 13.27
+      "seconds": 7.77
     },
     {
       "test": "changed window does not inherit previous scroll",
       "result": "PASS",
-      "seconds": 16.11
+      "seconds": 8.12
     },
     {
       "test": "OS rebind after process death and scrolling recovered",
       "result": "PASS",
-      "seconds": 10.55
+      "seconds": 4.92
     },
     {
       "test": "screen off removes trigger; unlock restores it",
       "result": "PASS",
-      "seconds": 11.77
+      "seconds": 4.52
     },
     {
       "test": "permission revocation removes overlay",
       "result": "PASS",
-      "seconds": 0.3
+      "seconds": 0.06
+    },
+    {
+      "test": "smooth list glides after release and reaches actual top",
+      "result": "PASS",
+      "seconds": 7.58
+    },
+    {
+      "test": "smooth grid glides after release and reaches actual top",
+      "result": "PASS",
+      "seconds": 5.34
+    },
+    {
+      "test": "smooth web glides after release and reaches actual top",
+      "result": "PASS",
+      "seconds": 5.65
+    },
+    {
+      "test": "smooth list already at top receives no physical swipe",
+      "result": "PASS",
+      "seconds": 2.76
+    },
+    {
+      "test": "smooth web already at top receives no physical swipe",
+      "result": "PASS",
+      "seconds": 3.03
+    },
+    {
+      "test": "smooth cancel stops sending additional gestures",
+      "result": "PASS",
+      "seconds": 4.72
+    },
+    {
+      "test": "smooth immediate second tap does not restart a cancelled stroke",
+      "result": "PASS",
+      "seconds": 4.49
+    },
+    {
+      "test": "smooth double-tap mode stops without restarting a cancelled stroke",
+      "result": "PASS",
+      "seconds": 4.33
+    },
+    {
+      "test": "smooth context change never sends a gesture to new window",
+      "result": "PASS",
+      "seconds": 4.54
+    },
+    {
+      "test": "closing TopTap in recent apps keeps background scrolling available",
+      "result": "PASS",
+      "seconds": 6.28
     }
   ],
-  "apk_sha256": "b9f8dcbb0df639dfb2a960970b7cd6bef2080030359650bfee86bf5851e29693",
-  "execution": "one emulator at a time"
+  "version": "1.1.0",
+  "execution": "one TopTap test emulator at a time"
 }

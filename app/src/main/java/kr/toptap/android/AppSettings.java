@@ -26,6 +26,8 @@ public final class AppSettings {
     public void setShowIndicator(boolean value) { prefs.edit().putBoolean("indicator", value).apply(); }
     public boolean gestureFallback() { return prefs.getBoolean("gesture_fallback", false); }
     public void setGestureFallback(boolean value) { prefs.edit().putBoolean("gesture_fallback", value).apply(); }
+    public boolean smoothScrolling() { return prefs.getBoolean("smooth_scroll", false); }
+    public void setSmoothScrolling(boolean value) { prefs.edit().putBoolean("smooth_scroll", value).apply(); }
     public int timeoutSeconds() { return Math.max(4, Math.min(20, prefs.getInt("timeout", 12))); }
     public void setTimeoutSeconds(int value) { prefs.edit().putInt("timeout", Math.max(4, Math.min(20, value))).apply(); }
     public Set<String> excludedApps() { return new HashSet<>(prefs.getStringSet("excluded", java.util.Collections.emptySet())); }

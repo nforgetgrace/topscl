@@ -175,6 +175,8 @@ public final class TopTapService extends AccessibilityService implements SharedP
         private final int screenWidth;
         private float downX;
         private boolean shadeDrag;
+        private boolean stopOnTap;
+        private long stopIntentAt;
         private long touchSequence;
         private boolean canOpenShade() {
             // This explicitly requested system action does not need a readable app
@@ -201,7 +203,13 @@ public final class TopTapService extends AccessibilityService implements SharedP
             TapRecognizer.Result result = TapRecognizer.Result.NONE;
             if (event.getPointerCount() > 1) { recognizer.cancel(); shadeDrag = false; return true; }
             switch (event.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN -> { touchSequence = ++gestureSequence; shadeDrag = false; downX = event.getRawX(); recognizer.down(event.getRawX(), event.getRawY(), event.getEventTime()); }
+                case MotionEvent.ACTION_DOWN -> {
+                    touchSequence = ++gestureSequence; shadeDrag = false; downX = event.getRawX();
+                    if (engine != null && engine.wasRunningAt(event.getEventTime())) {
+                        stopOnTap = true; stopIntentAt = event.getEventTime();
+                    } else if (!settings.doubleTap() || event.getEventTime() - stopIntentAt > 350) stopOnTap = false;
+                    recognizer.down(event.getRawX(), event.getRawY(), event.getEventTime());
+                }
                 case MotionEvent.ACTION_MOVE -> { if (recognizer.move(event.getRawX(), event.getRawY()) == TapRecognizer.Result.DRAG_DOWN) shadeDrag = true; }
                 case MotionEvent.ACTION_UP -> result = shadeDrag || recognizer.move(event.getRawX(), event.getRawY()) == TapRecognizer.Result.DRAG_DOWN
                     ? TapRecognizer.Result.DRAG_DOWN : recognizer.up(event.getRawX(), event.getRawY(), event.getEventTime(), settings.doubleTap());
@@ -213,7 +221,12 @@ public final class TopTapService extends AccessibilityService implements SharedP
                 case MotionEvent.ACTION_POINTER_DOWN -> { recognizer.cancel(); shadeDrag = false; }
                 default -> { }
             }
-            if (result == TapRecognizer.Result.TAP) performClick();
+            // A real DOWN can cancel an injected stroke before this UP arrives.
+            // Keep that tap's stop intent instead of accidentally starting again.
+            if (result == TapRecognizer.Result.TAP) {
+                if (engine != null && (!stopOnTap || engine.isRunning())) performClick();
+                stopOnTap = false;
+            }
             if (result == TapRecognizer.Result.DRAG_DOWN) {
                 engine.cancel("알림창을 열었어요");
                 setVisibility(View.INVISIBLE);

@@ -64,10 +64,11 @@ def pref(name):
 def launch(mode="list", offset=120):
     shell("am", "force-stop", FIXTURE)
     shell("run-as", FIXTURE, "rm", "-f", "shared_prefs/qa.xml", "shared_prefs/qa.xml.bak")
+    shell("run-as", FIXTURE, "rm", "-f", "files/motion.json")
     shell("am", "start", "-n", FIXTURE + "/.MainActivity", "--es", "mode", mode, "--ei", "offset", offset)
     time.sleep(.6)
-    wait_for(lambda: pref("mode")==mode and pref("ready") and (mode=="web" or (pref("position") or 0)>0), timeout=25, message="fixture loaded")
-    if mode=="web":
+    wait_for(lambda: pref("mode")==mode and pref("ready") and (mode=="web" or offset==0 or (pref("position") or 0)>0), timeout=25, message="fixture loaded")
+    if mode=="web" and offset>0:
         # Use real scrolling: programmatic host/JS seeding can leave stale
         # accessibility actions in emulator WebView, unlike user touch input.
         for _ in range(max(2,min(6,offset//24))):
@@ -221,6 +222,72 @@ try:
         def revoke():
             shell("settings","put","secure","enabled_accessibility_services",baseline);wait_for(lambda:not overlay_present(),message="revoked overlay removed")
         case("permission revocation removes overlay",revoke)
+        def smooth_top(mode):
+            setup(smooth_scroll=True);launch(mode,48 if mode=="web" else 120);wait_for(overlay_present)
+            old_touches=pref("touch_count") or 0
+            tap();wait_for(lambda:pref("position")==0,timeout=16,message="smooth "+mode+" reached top")
+            time.sleep(.6)
+            if mode!="web":assert pref("offset_px")==0,"Smooth scroll left first row clipped"
+            assert (pref("touch_count") or 0)>old_touches,"Smooth mode did not use touch input"
+            trace=json.loads(shell("run-as",FIXTURE,"cat","files/motion.json"))
+            (ROOT/"docs"/("motion-"+args.serial+"-"+mode+".json")).write_text(json.dumps(trace)+"\n")
+            # Require movement across multiple frames after the finger lifts:
+            # this proves native inertia rather than just an animated drag.
+            touches=trace["touch"][old_touches*2:]
+            glides=[]
+            for index,(ended,action) in enumerate(touches):
+                if action!=1:continue
+                next_down=next((t for t,a in touches[index+1:] if a==0),float("inf"))
+                samples=[(t,y) for t,y in trace["motion"] if ended<t<next_down]
+                if len(samples)>=5 and samples[-1][0]-samples[0][0]>=100:
+                    glides.append(samples[0][1]-samples[-1][1])
+            assert any(distance>200 for distance in glides),f"No sustained post-release glide: {glides}"
+            screenshot("qa-smooth-"+mode+"-top")
+        for mode in ("list","grid","web"):
+            case("smooth "+mode+" glides after release and reaches actual top",lambda m=mode:smooth_top(m))
+        def smooth_already_top(mode):
+            setup(smooth_scroll=True);launch(mode,0);wait_for(overlay_present);tap();time.sleep(.8)
+            assert pref("position")==0 and not pref("touch_count"),"Already-top viewport received a physical pull"
+        for mode in ("list","web"):
+            case("smooth "+mode+" already at top receives no physical swipe",lambda m=mode:smooth_already_top(m))
+        def smooth_stop():
+            setup(smooth_scroll=True);launch("list",350);wait_for(overlay_present);tap()
+            wait_for(lambda:(pref("touch_count") or 0)>0,message="smooth gesture began")
+            time.sleep(.15);tap();count=pref("touch_count");time.sleep(2.2)
+            assert pref("touch_count")==count,"New gesture sent after cancellation"
+            assert pref("position")>0,"Fixture too short to prove cancellation"
+        case("smooth cancel stops sending additional gestures",smooth_stop)
+        def smooth_immediate_stop():
+            setup(smooth_scroll=True);launch("list",350);wait_for(overlay_present)
+            shell("sh","-c","input tap 152 31; input tap 152 31");time.sleep(2)
+            assert (pref("touch_count") or 0)<=1,"Stop tap restarted the interrupted gesture"
+            count=pref("touch_count");time.sleep(.5);assert pref("touch_count")==count
+        case("smooth immediate second tap does not restart a cancelled stroke",smooth_immediate_stop)
+        def smooth_double_stop():
+            setup(smooth_scroll=True,double_tap=True);launch("list",350);wait_for(overlay_present)
+            shell("sh","-c","input tap 152 31; input tap 152 31")
+            wait_for(lambda:(pref("touch_count") or 0)>0,message="double tap started a smooth gesture")
+            shell("sh","-c","input tap 152 31; input tap 152 31")
+            count=pref("touch_count");time.sleep(2)
+            assert pref("touch_count")==count,"Double-tap stop became a new start"
+        case("smooth double-tap mode stops without restarting a cancelled stroke",smooth_double_stop)
+        def smooth_context():
+            setup(smooth_scroll=True);launch("list",350);wait_for(overlay_present);tap()
+            wait_for(lambda:(pref("touch_count") or 0)>0)
+            launch("list",120);time.sleep(1.2)
+            assert pref("position")==120 and not pref("touch_count"),"New window inherited a gesture"
+        case("smooth context change never sends a gesture to new window",smooth_context)
+        def close_app():
+            setup();wait_for(overlay_present)
+            activity_pattern=r"ActivityRecord\{[^\n]*kr\.toptap\.android/(?:kr\.toptap\.android\.)?\.?MainActivity"
+            assert re.search(activity_pattern,shell("dumpsys","activity","activities")),"TopTap activity was not open before dismissal"
+            shell("input","keyevent","KEYCODE_APP_SWITCH");time.sleep(1)
+            shell("input","swipe",540,1450,540,350,300);time.sleep(.6)
+            shell("input","keyevent","HOME")
+            activities=shell("dumpsys","activity","activities")
+            assert not re.search(activity_pattern,activities),"TopTap card was not dismissed"
+            launch();wait_for(overlay_present);tap();wait_for(lambda:pref("position")==0,message="scroll after recent-task dismissal")
+        case("closing TopTap in recent apps keeps background scrolling available",close_app)
     complete = True
 finally:
     shell("input","keyevent","224",check=False);shell("wm","dismiss-keyguard",check=False)

@@ -5,6 +5,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.MotionEvent;
 import android.view.WindowInsets;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.webkit.WebView;
@@ -20,6 +21,28 @@ import android.widget.TextView;
 /** Separate process/package proves cross-app behavior; deterministic offline fixtures only. */
 public final class MainActivity extends Activity {
     private TextView status;
+    private final android.os.Handler traceHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final org.json.JSONArray motionTrace=new org.json.JSONArray(),touchTrace=new org.json.JSONArray();
+    private int lastPixel=Integer.MIN_VALUE,touchCount;
+    private final Runnable saveTrace=()->{
+        try(java.io.FileOutputStream out=openFileOutput("motion.json",MODE_PRIVATE)) {
+            out.write(new org.json.JSONObject().put("motion",motionTrace).put("touch",touchTrace).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch(java.io.IOException | org.json.JSONException e){android.util.Log.e("TopTapFixture","Unable to save synthetic motion trace",e);}
+    };
+    private void recordMotion(int pixel) {
+        if(pixel==lastPixel)return;lastPixel=pixel;
+        if(motionTrace.length()<2000)motionTrace.put(new org.json.JSONArray().put(android.os.SystemClock.uptimeMillis()).put(pixel));
+        traceHandler.removeCallbacks(saveTrace);traceHandler.postDelayed(saveTrace,350);
+    }
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        int action=event.getActionMasked();
+        if(action==MotionEvent.ACTION_DOWN || action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL) {
+            touchTrace.put(new org.json.JSONArray().put(event.getEventTime()).put(action));
+            if(action==MotionEvent.ACTION_DOWN)getSharedPreferences("qa",MODE_PRIVATE).edit().putInt("touch_count",++touchCount).apply();
+            traceHandler.removeCallbacks(saveTrace);traceHandler.postDelayed(saveTrace,350);
+        }
+        return super.dispatchTouchEvent(event);
+    }
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private void position(int value){status.setText("POS="+value+(value==0?" TOP_REACHED":""));getSharedPreferences("qa",MODE_PRIVATE).edit().putInt("position",value).apply();}
     @Override public void onCreate(Bundle state){
@@ -43,7 +66,7 @@ public final class MainActivity extends Activity {
                 @Override public boolean performAccessibilityAction(View host,int action,Bundle args){if(action==AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD || action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.getId())return false;return super.performAccessibilityAction(host,action,args);}});
             root.addView(scroller,new LinearLayout.LayoutParams(-1,0,1));scroller.postDelayed(()->{scroller.scrollTo(0,offset*dp(80));position(scroller.getScrollY());getSharedPreferences("qa",MODE_PRIVATE).edit().putBoolean("ready",true).apply();},300);
         }else if(mode.equals("web")){
-            WebView web=new WebView(this){@Override protected void onScrollChanged(int x,int y,int oldX,int oldY){super.onScrollChanged(x,y,oldX,oldY);position(y);}};
+            WebView web=new WebView(this){@Override protected void onScrollChanged(int x,int y,int oldX,int oldY){super.onScrollChanged(x,y,oldX,oldY);position(y);recordMotion(y);}};
             // The harness scrolls this with real touch input, matching the user's
             // workflow and keeping native/virtual accessibility state synchronized.
             web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView view,String url){view.postDelayed(()->{position(view.getScrollY());getSharedPreferences("qa",MODE_PRIVATE).edit().putBoolean("ready",true).apply();},300);}});
@@ -60,7 +83,12 @@ public final class MainActivity extends Activity {
             if(mode.equals("grid")){GridView grid=new GridView(this);grid.setNumColumns(3);grid.setVerticalSpacing(dp(8));grid.setHorizontalSpacing(dp(8));list=grid;}else list=new ListView(this);
             list.setAdapter(new BaseAdapter(){public int getCount(){return 400;}public Object getItem(int p){return p;}public long getItemId(int p){return p;}
                 public View getView(int p,View old,ViewGroup parent){TextView row=new TextView(MainActivity.this);row.setText(p==0?"TOP_REACHED":"Item "+p);row.setTextSize(18);row.setPadding(dp(16),dp(22),dp(16),dp(22));row.setMinHeight(dp(kind.equals("grid")?110:64));row.setBackgroundColor(p%2==0?0xffe9effe:0xffffffff);return row;}});
-            list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){}public void onScroll(AbsListView v,int first,int visible,int total){position(first);if(v.getChildCount()>0)getSharedPreferences("qa",MODE_PRIVATE).edit().putInt("offset_px",v.getChildAt(0).getTop()-v.getPaddingTop()).apply();}});
+            list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView v,int s){}public void onScroll(AbsListView v,int first,int visible,int total){position(first);if(v.getChildCount()>0){
+                View child=v.getChildAt(0);int offsetPx=child.getTop()-v.getPaddingTop();
+                getSharedPreferences("qa",MODE_PRIVATE).edit().putInt("offset_px",offsetPx).apply();
+                int spacing=v instanceof ListView?((ListView)v).getDividerHeight():((GridView)v).getVerticalSpacing();
+                recordMotion((kind.equals("grid")?first/3:first)*(child.getHeight()+spacing)-offsetPx);
+            }}});
             if(mode.equals("direct"))list.setAccessibilityDelegate(new View.AccessibilityDelegate(){
                 @Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION);}
                 @Override public boolean performAccessibilityAction(View host,int action,Bundle args){if(action==AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_TO_POSITION.getId()){list.setSelection(0);return true;}return super.performAccessibilityAction(host,action,args);}});

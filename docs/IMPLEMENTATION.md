@@ -21,6 +21,18 @@ No general claim of universal app compatibility or immunity to Android force-sto
 
 실행 가능한 검증 명령, 결과 및 미검증 범위는 [VERIFICATION.md](VERIFICATION.md)에 기록합니다.
 
+## 1.1.0의 관성 스크롤
+
+‘부드럽게 올라가기’는 명시적으로 켜는 선택 기능입니다. 식별된 세로 목록에 80ms 스와이프를 보내고, 손을 뗀 뒤에는 대상 앱의 관성 애니메이션이 이어지도록 기다립니다. 실제 스크롤 이벤트가 계속 오는 동안 다음 스와이프를 보내지 않습니다. 종료 직후 최소 280ms, 마지막 움직임 이후 160ms를 기다리는 시간 정책을 Android 독립 테스트로 확인합니다.
+
+최대 네 번의 스와이프와 기존 실행 시간 제한을 함께 적용합니다. 이미 위에 있는 일반 목록에는 터치를 보내지 않습니다. WebView가 위쪽 동작 정보를 빠뜨리면 첫 동작에서 의미 스크롤을 요청해 위쪽 이동을 확인하고 관성 방식으로 이어갑니다. 현재 창·잠금·제외 앱·재실행 등의 중지 조건은 기존 엔진을 공유합니다. 중지 후 추가 스와이프를 보내지 않으며, 이미 시작된 다른 앱의 관성 자체를 강제로 끄지는 않습니다.
+
+fixture는 합성 스크롤의 시간/픽셀 위치와 DOWN/UP 이벤트를 기록합니다. 손을 뗀 뒤 여러 프레임에 걸쳐 추가 이동이 일어나는지 검사하므로, 최종 위치만으로 부드러운 모드를 통과시키지 않습니다. 기록은 별도 테스트 앱에만 존재하며 제품에서 사용자 터치 위치나 화면 데이터를 기록하는 기능을 추가하지 않았습니다.
+
+최근 앱에서 닫기 검사는 탑탭의 Activity가 열려 있는지 확인한 뒤 실제 최근 앱 카드에서 밀어서 제거하고, Activity가 사라진 상태에서 다른 앱의 스크롤을 실행합니다. 서비스가 화면 Activity에 의존하지 않는 기존 수명 구조를 검증하며, 강제 중지나 제조사의 절전 정책을 무시하는 권한을 추가하지 않습니다.
+
+공식 동작 근거: [AccessibilityService.dispatchGesture](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService#dispatchGesture(android.accessibilityservice.GestureDescription,%20android.accessibilityservice.AccessibilityService.GestureResultCallback,%20android.os.Handler))는 실제 사용자 터치처럼 전달되며 진행 중인 제스처를 취소할 수 있습니다. 따라서 동작 중인 관성을 짧은 고정 주기로 재시작하지 않도록 설계했습니다.
+
 ## Sources checked
 - https://play.google.com/store/apps/details?id=com.scroll.scrolltop.backtotop&hl=ko
 - https://developer.android.com/guide/topics/ui/accessibility/service

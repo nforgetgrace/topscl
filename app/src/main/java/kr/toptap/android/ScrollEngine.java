@@ -16,6 +16,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import java.util.ArrayDeque;
 import java.util.List;
+import kr.toptap.android.core.ScrollCoast;
 
 /** One bounded run, no idle work, no retained screen text, one action at a time. */
 public final class ScrollEngine {
@@ -25,20 +26,26 @@ public final class ScrollEngine {
     private final Listener listener;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean running, jumped, atTop, haveProgress, awaitingGesture, semanticMoved;
+    private boolean smooth, coasting;
+    private int motionVersion, gestureMotionVersion;
+    private final ScrollCoast coast = new ScrollCoast();
     private int gestures;
     private int initialRejections;
     private int generation, windowId, steps, stagnant, lastY, lastIndex, progressVersion, previousVersion;
     private String packageName, targetClass, targetId;
     private final Rect targetBounds = new Rect();
-    private long started;
+    private long started, stopped;
     private final Runnable nextStep = this::step;
 
     public ScrollEngine(AccessibilityService service, AppSettings settings, Listener listener) {
         this.service = service; this.settings = settings; this.listener = listener;
     }
     public boolean isRunning() { return running; }
+    public boolean wasRunningAt(long eventTime) {
+        return started > 0 && eventTime >= started && (running || eventTime <= stopped);
+    }
     public void toggle() {
-        if (running) { cancel("스크롤을 멈췄어요"); return; }
+        if (running) { cancel(smooth ? "추가 스크롤을 멈췄어요. 화면을 터치하면 관성도 멈춰요" : "스크롤을 멈췄어요"); return; }
         if (!allowed()) { listener.onState(false, "연결 상태와 제외 앱을 확인해 주세요"); return; }
         AccessibilityNodeInfo root = null;
         try {
@@ -58,6 +65,7 @@ public final class ScrollEngine {
         running = true; generation++; jumped = false; atTop = false; haveProgress = false; awaitingGesture = false; semanticMoved = false; gestures = 0;
         steps = 0; initialRejections = 0; stagnant = 0; progressVersion = 0; previousVersion = 0; lastY = -1; lastIndex = -1;
         started = SystemClock.uptimeMillis();
+        smooth = settings.smoothScrolling(); coasting = false; motionVersion = 0;
         listener.onState(true, "맨 위로 이동 중 · 한 번 더 누르면 멈춰요");
         handler.post(nextStep);
     }
@@ -65,7 +73,8 @@ public final class ScrollEngine {
         if (!running) return;
         if ((service.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0)
             android.util.Log.d("TopTap", "steps="+steps+" elapsedMs="+(SystemClock.uptimeMillis()-started));
-        running = false; awaitingGesture = false; generation++;
+        running = false; awaitingGesture = false; coasting = false; generation++;
+        stopped = SystemClock.uptimeMillis();
         handler.removeCallbacksAndMessages(null);
         listener.onState(false, reason);
     }
@@ -95,6 +104,8 @@ public final class ScrollEngine {
         try {
             source = event.getSource();
             if (source == null || !matchesTarget(source)) return;
+            motionVersion++;
+            if (coasting) coast.motion(SystemClock.uptimeMillis());
             int y = event.getScrollY(); int index = event.getFromIndex();
             if (y >= 0 || index >= 0) {
                 if (!haveProgress || (y >= 0 && y != lastY) || (index >= 0 && index != lastIndex)) progressVersion++;
@@ -128,6 +139,13 @@ public final class ScrollEngine {
         if (SystemClock.uptimeMillis() - started >= settings.timeoutSeconds() * 1000L || steps >= 120) {
             cancel("시간 제한에 도달했어요. 더 이동하려면 다시 눌러 주세요"); return;
         }
+        if (coasting) {
+            if (atTop) { cancel("맨 위에 도착했어요"); return; }
+            long delay = coast.remaining(SystemClock.uptimeMillis());
+            if (delay > 0) { handler.postDelayed(nextStep, Math.min(80, delay)); return; }
+            coasting = false;
+            if (motionVersion == gestureMotionVersion) { cancel("움직임이 확인되지 않아 멈췄어요"); return; }
+        }
         if (awaitingGesture) { cancel("동작 응답이 없어 스크롤을 멈췄어요"); return; }
         AccessibilityNodeInfo root = null, target = null;
         try {
@@ -138,6 +156,25 @@ public final class ScrollEngine {
             target = findTarget(root);
             if (target == null || !target.refresh() || !matchesTarget(target)) { cancel("스크롤 대상이 바뀌었어요"); return; }
             if (atTop) { cancel("맨 위에 도착했어요"); return; }
+            if (smooth) {
+                if (gestures >= 4) { cancel("더 이동하려면 상단을 다시 눌러 주세요"); return; }
+                boolean upward = has(target, AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+                    || has(target, AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.getId());
+                if (!upward) {
+                    // Probe WebView's sometimes-incomplete action list semantically;
+                    // don't begin a physical pull on a viewport already at its top.
+                    if (targetClass.contains("WebView") && !semanticMoved && performSemanticScroll(target)) {
+                        steps++; handler.postDelayed(nextStep, 500);
+                        // This probe is followed by a fling once movement is observed.
+                        semanticMoved = true;
+                        return;
+                    }
+                    if (!targetClass.contains("WebView") || !semanticMoved) {
+                        cancel("이미 맨 위이거나 이 화면이 위로 이동을 지원하지 않아요"); return;
+                    }
+                }
+                gestures++; swipe(target); return;
+            }
             if (steps > 0) {
                 stagnant = progressVersion == previousVersion ? stagnant + 1 : 0;
                 if (stagnant >= 5) { cancel("더 이상 이동이 확인되지 않아 멈췄어요"); return; }
@@ -193,12 +230,15 @@ public final class ScrollEngine {
         }
         Path path = new Path(); float x = rect.exactCenterX();
         path.moveTo(x, rect.top + rect.height() * .25f); path.lineTo(x, rect.top + rect.height() * .8f);
-        GestureDescription gesture = new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, 130)).build();
+        GestureDescription gesture = new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0, smooth ? 80 : 130)).build();
         final int token = generation; awaitingGesture = true; steps++;
+        gestureMotionVersion = motionVersion;
         boolean accepted = service.dispatchGesture(gesture, new AccessibilityService.GestureResultCallback() {
             @Override public void onCompleted(GestureDescription description) {
                 if (!running || token != generation) return;
-                awaitingGesture = false; handler.removeCallbacks(nextStep); handler.postDelayed(nextStep, 250);
+                awaitingGesture = false; handler.removeCallbacks(nextStep);
+                if (smooth) { coasting = true; coast.begin(SystemClock.uptimeMillis()); }
+                handler.postDelayed(nextStep, smooth ? 80 : 250);
             }
             @Override public void onCancelled(GestureDescription description) {
                 if (running && token == generation) cancel("터치가 중단되어 스크롤을 멈췄어요");

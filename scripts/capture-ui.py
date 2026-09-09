@@ -18,9 +18,10 @@ def nodes():
     shell('uiautomator','dump','/sdcard/toptap-ui.xml')
     return list(ET.fromstring(shell('cat','/sdcard/toptap-ui.xml')).iter('node'))
 def click(text):
-    for node in nodes():
-        if node.attrib.get('text')==text:
-            l,t,r,b=map(int,re.findall(r'\d+',node.attrib['bounds']));shell('input','tap',(l+r)//2,(t+b)//2);time.sleep(.6);return
+    items=nodes()
+    matches=[node for node in items if node.attrib.get('content-desc')==text] or [node for node in items if node.attrib.get('text')==text]
+    for node in matches:
+        l,t,r,b=map(int,re.findall(r'\d+',node.attrib['bounds']));shell('input','tap',(l+r)//2,(t+b)//2);time.sleep(.6);return
     raise AssertionError('Control absent: '+text)
 def capture(name):
     time.sleep(1);(out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p',binary=True))
@@ -30,11 +31,18 @@ try:
     shell('settings','put','system','font_scale','1.0');shell('settings','put','system','accelerometer_rotation','0');shell('settings','put','system','user_rotation','0')
     adb('install','-r',str(root/'app/build/outputs/apk/debug/app-debug.apk'))
     shell('am','force-stop','kr.toptap.android');shell('am','start','-n','kr.toptap.android/.MainActivity');time.sleep(1)
-    capture('home');click('설정');capture('settings');click('도움말');capture('help');click('홈')
+    capture('home');click('설정');capture('settings')
+    previous=next(n.attrib.get('checked')=='true' for n in nodes() if n.attrib.get('content-desc')=='부드럽게 올라가기')
+    click('부드럽게 올라가기')
+    preferences=ET.fromstring(shell('run-as','kr.toptap.android','cat','shared_prefs/toptap.xml'))
+    current=preferences.find("boolean[@name='smooth_scroll']").attrib['value']=='true'
+    assert current!=previous,'Smooth switch did not persist its value'
+    capture('settings-smooth');click('부드럽게 올라가기')
+    click('도움말');capture('help');click('홈')
     shell('settings','put','system','font_scale','2.0');time.sleep(1);capture('home-large-text');click('설정');capture('settings-large-text')
     shell('settings','put','system','font_scale','1.0');shell('wm','user-rotation','lock','1');time.sleep(2);capture('settings-landscape')
     click('도움말');capture('help-landscape')
-    print('PASS: 7 native UI states captured; all navigation controls found')
+    print('PASS: 8 native UI states captured; navigation and smooth switch verified')
 finally:
     shell('wm','user-rotation','free')
     for key,value in old.items():
