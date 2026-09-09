@@ -1,0 +1,105 @@
+{
+  "device": "emulator-5580",
+  "android": "15",
+  "suite": "full",
+  "passed": true,
+  "tests": [
+    {
+      "test": "cross-app direct returns to actual top",
+      "result": "PASS",
+      "seconds": 3.45
+    },
+    {
+      "test": "cross-app granular returns to actual top",
+      "result": "PASS",
+      "seconds": 2.9
+    },
+    {
+      "test": "cross-app list returns to actual top",
+      "result": "PASS",
+      "seconds": 7.1
+    },
+    {
+      "test": "cross-app grid returns to actual top",
+      "result": "PASS",
+      "seconds": 4.86
+    },
+    {
+      "test": "cross-app web returns to actual top",
+      "result": "PASS",
+      "seconds": 8.0
+    },
+    {
+      "test": "horizontal-only carousel unchanged",
+      "result": "PASS",
+      "seconds": 4.03
+    },
+    {
+      "test": "range control value is never adjusted",
+      "result": "PASS",
+      "seconds": 3.65
+    },
+    {
+      "test": "gesture fallback is disabled by default",
+      "result": "PASS",
+      "seconds": 8.45
+    },
+    {
+      "test": "opt-in gesture fallback scrolls identified viewport",
+      "result": "PASS",
+      "seconds": 6.77
+    },
+    {
+      "test": "very long web respects time budget and resumes on next tap",
+      "result": "PASS",
+      "seconds": 20.11
+    },
+    {
+      "test": "pause removes overlay and disables trigger",
+      "result": "PASS",
+      "seconds": 5.15
+    },
+    {
+      "test": "excluded app untouched",
+      "result": "PASS",
+      "seconds": 5.03
+    },
+    {
+      "test": "double-tap mode ignores one tap",
+      "result": "PASS",
+      "seconds": 10.87
+    },
+    {
+      "test": "trigger downward drag opens shade without scrolling",
+      "result": "PASS",
+      "seconds": 7.49
+    },
+    {
+      "test": "second activation cancels ongoing scroll",
+      "result": "PASS",
+      "seconds": 13.27
+    },
+    {
+      "test": "changed window does not inherit previous scroll",
+      "result": "PASS",
+      "seconds": 16.11
+    },
+    {
+      "test": "OS rebind after process death and scrolling recovered",
+      "result": "PASS",
+      "seconds": 10.55
+    },
+    {
+      "test": "screen off removes trigger; unlock restores it",
+      "result": "PASS",
+      "seconds": 11.77
+    },
+    {
+      "test": "permission revocation removes overlay",
+      "result": "PASS",
+      "seconds": 0.3
+    }
+  ],
+  "apk_sha256": "b9f8dcbb0df639dfb2a960970b7cd6bef2080030359650bfee86bf5851e29693",
+  "execution": "one emulator at a time"
+}
